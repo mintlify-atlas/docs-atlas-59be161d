@@ -1,0 +1,112 @@
+{
+  "projectType": "framework",
+  "projectName": "Saykit",
+  "projectDescription": "Framework-agnostic i18n translation framework with compile-time message extraction and type-safe configuration",
+  "theme": "palm",
+  "primaryColor": "#3B82F6",
+  "lightColor": "#60A5FA",
+  "darkColor": "#2563EB",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/architecture",
+              "concepts/configuration",
+              "concepts/messages",
+              "concepts/locales"
+            ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "integrations/react",
+              "integrations/babel",
+              "integrations/unplugin"
+            ]
+          },
+          {
+            "group": "CLI Reference",
+            "pages": [
+              "cli/extract",
+              "cli/compile",
+              "cli/build"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/message-extraction",
+              "guides/pluralization",
+              "guides/custom-formatters",
+              "guides/typescript"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Core API",
+            "pages": [
+              "api/say-class",
+              "api/define-config",
+              "api/macros"
+            ]
+          },
+          {
+            "group": "React API",
+            "pages": [
+              "api/react/say-provider",
+              "api/react/use-say"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "api/config/bucket",
+              "api/config/formatter"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Template literal-based message definition with macro syntax",
+    "Compile-time message extraction from source code",
+    "Framework-agnostic core with React and Carbon integrations",
+    "ICU MessageFormat support with pluralization and select",
+    "Type-safe configuration with Zod schema validation",
+    "CLI tools for extraction, compilation, and building",
+    "PO file format support with custom formatter API",
+    "Babel plugin and unplugin for build tool integration"
+  ],
+  "publicApiSurface": [
+    "Say class - Core i18n runtime with locale management",
+    "say() - Template literal macro for message definition",
+    "say.plural() - Pluralization macro with CLDR categories",
+    "say.ordinal() - Ordinal number formatting macro",
+    "say.select() - Select message based on string value",
+    "defineConfig() - Type-safe configuration helper",
+    "SayProvider - React context provider for i18n",
+    "useSay() - React hook to access Say instance",
+    "saykit extract - CLI command to extract messages",
+    "saykit compile - CLI command to compile translations",
+    "saykit build - CLI command to build messages",
+    "@saykit/babel-plugin - Babel transform plugin",
+    "unplugin-saykit - Universal plugin for bundlers"
+  ]
+}
