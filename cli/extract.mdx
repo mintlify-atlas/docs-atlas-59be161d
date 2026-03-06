@@ -1,0 +1,130 @@
+---
+title: 'saykit extract'
+description: 'Extract translatable messages from your source code'
+---
+
+## Overview
+
+The `extract` command scans your source files for translatable messages and generates translation files in your configured format. It analyzes all files matching your bucket patterns, extracts message definitions, and writes them to locale-specific files.
+
+## Syntax
+
+```bash
+saykit extract [options]
+```
+
+## Options
+
+<ParamField path="-v, --verbose" type="boolean" default="false">
+  Enable verbose logging to see detailed extraction progress, including each file processed and the number of messages found.
+</ParamField>
+
+<ParamField path="-q, --quiet" type="boolean" default="false">
+  Suppress all logging output. Only errors will be displayed.
+</ParamField>
+
+## How It Works
+
+### 1. Scanning Phase
+
+The extract command uses the `BucketExtractWorker` to:
+
+- **Glob source files**: Scans all files matching the `include` patterns in each bucket configuration
+- **Parse with Babel**: Analyzes each file to identify message definitions using the `@saykit/babel-plugin`
+- **Index messages**: Collects all messages with their metadata (ID, context, comments, references)
+
+### 2. Writing Phase
+
+For each configured locale:
+
+- **Source locale**: Writes all extracted messages directly
+- **Other locales**: Reconciles with existing translations to preserve translated content
+- **Merges duplicates**: Combines messages with the same ID or hash, merging comments and file references
+- **Outputs files**: Writes to the location specified in your bucket's `output` pattern
+
+## Message Format
+
+Extracted messages include:
+
+- **message**: The ICU-formatted source string
+- **translation**: The translated string (preserved from existing files)
+- **id**: Optional explicit message ID
+- **context**: Optional context for disambiguation
+- **comments**: Translator notes and comments from code
+- **references**: Source file paths where the message appears
+
+## Examples
+
+### Basic extraction
+
+```bash
+saykit extract
+```
+
+**Output:**
+```
+🛠 Extracting Messages
+Scanning bucket: ["src/**/*.{ts,tsx}"]
+Found 42 file(s)
+Processing src/components/Button.tsx
+Found 3 messages(s) in src/components/Button.tsx
+Processing src/pages/Home.tsx
+Found 8 messages(s) in src/pages/Home.tsx
+Total extracted messages: 47
+Writing 47 messages to locales
+Writing locale file for en to disk
+Writing locale file for es to disk
+Writing locale file for fr to disk
+Extraction complete for bucket: ["src/**/*.{ts,tsx}"]
+```
+
+### Verbose extraction
+
+```bash
+saykit extract --verbose
+```
+
+Shows detailed information about each file processed and every message found.
+
+### Quiet extraction
+
+```bash
+saykit extract --quiet
+```
+
+Runs silently, only showing errors if they occur.
+
+## Output Files
+
+The command writes files according to your bucket configuration:
+
+```typescript
+{
+  buckets: [{
+    include: ["src/**/*.tsx"],
+    output: "locales/{locale}.{extension}"
+  }]
+}
+```
+
+This produces:
+- `locales/en.po`
+- `locales/es.po`
+- `locales/fr.po`
+
+## Configuration
+
+The extract command reads your `saykit.config.ts` file to determine:
+
+- **Buckets**: Which files to scan (`include`/`exclude` patterns)
+- **Locales**: Which locale files to generate
+- **Formatter**: Output format (defaults to `.po` format via `@saykit/format-po`)
+- **Source locale**: The primary language of your messages
+
+<Tip>
+Run `extract` after adding new messages to your code to update your translation files.
+</Tip>
+
+<Note>
+Existing translations are preserved when you re-run extract. Only new messages are added, and removed messages are excluded from the output.
+</Note>

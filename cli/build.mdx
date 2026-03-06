@@ -1,0 +1,204 @@
+---
+title: 'saykit build'
+description: 'Complete build workflow: extract and compile in one command'
+---
+
+## Overview
+
+The `build` command is a convenience wrapper that runs the full localization workflow: it extracts messages from source code and immediately compiles them into runtime-ready bundles. This is the recommended command for most development and CI/CD workflows.
+
+## Syntax
+
+```bash
+saykit build [options]
+```
+
+## Options
+
+<ParamField path="-v, --verbose" type="boolean" default="false">
+  Enable verbose logging to see detailed progress for both extraction and compilation phases.
+</ParamField>
+
+<ParamField path="-q, --quiet" type="boolean" default="false">
+  Suppress all logging output. Only errors will be displayed.
+</ParamField>
+
+## How It Works
+
+The build command uses the `BucketBuildWorker`, which orchestrates both extraction and compilation:
+
+### 1. Extract Phase
+
+Runs `BucketExtractWorker` to:
+- Scan all source files matching bucket patterns
+- Extract translatable messages with metadata
+- Write updated translation files for all locales
+
+### 2. Compile Phase
+
+Runs `BucketCompileWorker` to:
+- Read the newly extracted translation files
+- Apply fallback logic for missing translations
+- Generate optimized runtime JSON bundles
+
+### 3. Sequential Execution
+
+The build worker ensures:
+- Extraction completes before compilation starts
+- All buckets are processed in parallel for efficiency
+- Errors in one bucket don't block others (`Promise.allSettled`)
+
+## Examples
+
+### Basic build
+
+```bash
+saykit build
+```
+
+**Output:**
+```
+🏗 Building Messages
+Scanning bucket: ["src/**/*.{ts,tsx}"]
+Found 42 file(s)
+Processing src/components/Button.tsx
+Found 3 messages(s) in src/components/Button.tsx
+Processing src/pages/Home.tsx
+Found 8 messages(s) in src/pages/Home.tsx
+Total extracted messages: 47
+Writing 47 messages to locales
+Writing locale file for en to disk
+Writing locale file for es to disk
+Writing locale file for fr to disk
+Extraction complete for bucket: ["src/**/*.{ts,tsx}"]
+Compiling bucket: ["src/**/*.{ts,tsx}"]
+Compiling locale: en
+Writing runtime file for en
+Compiling locale: es
+Writing runtime file for es
+Compiling locale: fr
+Writing runtime file for fr
+Compilation complete for bucket: ["src/**/*.{ts,tsx}"]
+```
+
+### Verbose build
+
+```bash
+saykit build --verbose
+```
+
+Shows detailed logging for every file processed, message extracted, and locale compiled.
+
+### Quiet build
+
+```bash
+saykit build --quiet
+```
+
+Runs silently, ideal for CI/CD pipelines where you only want to see errors.
+
+## Multi-Bucket Support
+
+If your configuration defines multiple buckets, `build` processes them all:
+
+```typescript
+{
+  buckets: [
+    {
+      include: ["src/app/**/*.tsx"],
+      output: "locales/app/{locale}.{extension}"
+    },
+    {
+      include: ["src/marketing/**/*.tsx"],
+      output: "locales/marketing/{locale}.{extension}"
+    }
+  ]
+}
+```
+
+Both buckets are extracted and compiled independently in parallel.
+
+## Watch Mode (Coming Soon)
+
+The build command includes commented-out watch functionality:
+
+```bash
+# Future feature
+saykit build --watch
+```
+
+This would:
+- Monitor source files for changes
+- Automatically re-extract and recompile when files change
+- Ideal for development workflows
+
+<Note>
+Watch mode is currently disabled in the codebase but may be enabled in future releases.
+</Note>
+
+## When to Use
+
+Use `saykit build` in these scenarios:
+
+### Development
+- After adding new messages to your code
+- When starting work on localization
+- Before testing translation updates
+
+### CI/CD Pipeline
+```bash
+# In your build script
+npm run build:app
+saykit build
+npm run deploy
+```
+
+### Pre-commit Hook
+```bash
+#!/bin/bash
+saykit build --quiet
+git add locales/
+```
+
+Ensures translation files are always up to date.
+
+## Output Files
+
+The build command generates both:
+
+**Source translation files** (for translators):
+- `locales/en.po`
+- `locales/es.po`
+- `locales/fr.po`
+
+**Runtime bundles** (for your app):
+- `locales/en.json`
+- `locales/es.json`
+- `locales/fr.json`
+
+<Tip>
+Use `build` as your primary command. Only use `extract` or `compile` separately when you need fine-grained control over the workflow.
+</Tip>
+
+## Comparison with Separate Commands
+
+| Scenario | Command | Why |
+|----------|---------|-----|
+| Normal development | `saykit build` | Keeps everything in sync |
+| Added new messages | `saykit build` | Extract and compile together |
+| Translations updated | `saykit compile` | Only need to recompile |
+| Debugging extraction | `saykit extract -v` | Focus on extraction only |
+| CI/CD pipeline | `saykit build` | Complete workflow |
+
+## Performance
+
+The build command is optimized for speed:
+- Processes all buckets in parallel
+- Uses `Promise.allSettled` to prevent blocking
+- Reuses parsed AST when extracting messages
+- Caches fallback translations during compilation
+
+For a typical project with 500 messages across 3 locales:
+- Extraction: ~2-5 seconds
+- Compilation: ~100-500ms
+- **Total: ~2-6 seconds**

@@ -1,0 +1,196 @@
+---
+title: 'Bucket'
+description: 'Configure translation file buckets with include/exclude patterns and output templates'
+---
+
+A `Bucket` defines a group of source files that share the same translation output location and format. Each bucket specifies which files to scan for translatable strings and where to write the resulting translation files.
+
+## Properties
+
+<ParamField path="include" type="string[]" required>
+  Array of glob patterns to match source files. Uses [picomatch](https://github.com/micromatch/picomatch) for pattern matching.
+  
+  ```typescript
+  include: ['src/**/*.{ts,tsx}', 'pages/**/*.js']
+  ```
+  
+  Common patterns:
+  - `src/**/*.ts` - All TypeScript files in src directory
+  - `**/*.{js,jsx}` - All JavaScript and JSX files
+  - `components/**/*` - All files in components directory
+</ParamField>
+
+<ParamField path="exclude" type="string[]">
+  Array of glob patterns to exclude from matching. Also uses picomatch.
+  
+  ```typescript
+  exclude: ['**/*.test.ts', '**/node_modules/**']
+  ```
+  
+  Useful for excluding:
+  - Test files: `**/*.test.ts`, `**/*.spec.js`
+  - Generated files: `**/*.generated.ts`
+  - Dependencies: `**/node_modules/**`
+</ParamField>
+
+<ParamField path="output" type="string" required>
+  Template string defining where translation files are written. Must contain both `{locale}` and `.{extension}` placeholders.
+  
+  **Template format:**
+  - `{locale}` - Replaced with the locale code (e.g., `en`, `fr`, `ja`)
+  - `.{extension}` - Replaced with the formatter's extension (e.g., `.po`, `.json`)
+  
+  ```typescript
+  output: 'src/locales/{locale}/messages.{extension}'
+  // Generates:
+  // src/locales/en/messages.po
+  // src/locales/fr/messages.po
+  ```
+  
+  Other valid patterns:
+  ```typescript
+  // Locale as subdirectory
+  output: 'i18n/{locale}/translations.{extension}'
+  
+  // Locale in filename
+  output: 'translations/messages-{locale}.{extension}'
+  
+  // Multiple directory levels
+  output: 'src/app/locales/{locale}/messages.{extension}'
+  ```
+</ParamField>
+
+<ParamField path="formatter" type="Formatter">
+  Custom formatter for parsing and generating translation files. Defaults to `@saykit/format-po` if not specified.
+  
+  See [Formatter](/api/config/formatter) for details on implementing custom formatters.
+</ParamField>
+
+## Examples
+
+### Basic Configuration
+
+```typescript saykit.config.ts
+import { defineConfig } from '@saykit/config';
+
+export default defineConfig({
+  sourceLocale: 'en',
+  locales: ['en', 'fr'],
+  buckets: [
+    {
+      include: ['src/**/*.{ts,tsx}'],
+      output: 'src/locales/{locale}/messages.{extension}',
+    },
+  ],
+});
+```
+
+### Multiple Buckets
+
+Separate frontend and backend translations:
+
+```typescript saykit.config.ts
+import { defineConfig } from '@saykit/config';
+
+export default defineConfig({
+  sourceLocale: 'en',
+  locales: ['en', 'fr', 'es'],
+  buckets: [
+    {
+      include: ['src/components/**/*.tsx'],
+      output: 'src/locales/frontend/{locale}/messages.{extension}',
+    },
+    {
+      include: ['src/api/**/*.ts'],
+      exclude: ['**/*.test.ts'],
+      output: 'src/locales/backend/{locale}/messages.{extension}',
+    },
+  ],
+});
+```
+
+### With Exclusions
+
+```typescript saykit.config.ts
+import { defineConfig } from '@saykit/config';
+
+export default defineConfig({
+  sourceLocale: 'en',
+  locales: ['en', 'ja'],
+  buckets: [
+    {
+      include: ['src/**/*.ts'],
+      exclude: [
+        '**/*.test.ts',
+        '**/*.spec.ts',
+        '**/vendor/**',
+        '**/*.d.ts',
+      ],
+      output: 'i18n/{locale}/app.{extension}',
+    },
+  ],
+});
+```
+
+### JSON Configuration
+
+Buckets can also be defined in `saykit.config.json`:
+
+```json saykit.config.json
+{
+  "$schema": "./node_modules/@saykit/config/dist/schema.json",
+  "sourceLocale": "en",
+  "locales": ["en", "fr"],
+  "buckets": [
+    {
+      "include": ["src/**/*.ts"],
+      "output": "src/locales/{locale}/messages.{extension}"
+    }
+  ]
+}
+```
+
+## Pattern Matching
+
+Buckets use [picomatch](https://github.com/micromatch/picomatch) for glob pattern matching. The matcher is created internally:
+
+```typescript
+import picomatch from 'picomatch';
+
+const bucket = {
+  include: ['src/**/*.ts'],
+  exclude: ['**/*.test.ts'],
+  // ...
+};
+
+// Saykit creates a matcher internally:
+const match = picomatch(bucket.include, { ignore: bucket.exclude });
+
+// Files are tested against this matcher:
+match('src/i18n.ts'); // true
+match('src/i18n.test.ts'); // false (excluded)
+match('lib/utils.ts'); // false (not in src/)
+```
+
+## Type Definition
+
+From `@saykit/config/src/shapes.ts:39`:
+
+```typescript
+export const Bucket = z
+  .object({
+    include: z.array(z.string()),
+    exclude: z.array(z.string()).optional(),
+    output: z.templateLiteral([
+      z.string(),
+      '{locale}',
+      z.string(),
+      '.{extension}',
+    ]),
+    formatter: Formatter.optional(),
+  })
+  .transform((v) => ({
+    ...v,
+    match: picomatch(v.include, { ignore: v.exclude }),
+  }));
+```

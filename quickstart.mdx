@@ -1,80 +1,288 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Get started with Saykit in minutes
 ---
 
-## Get started in three steps
+This guide will walk you through setting up Saykit and creating your first translated message.
 
-Get your documentation site running locally and make your first customization.
+## Prerequisites
 
-### Step 1: Set up your local environment
+Before you begin, make sure you have:
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+- Installed Saykit and the necessary packages for your framework ([see Installation](/installation))
+- Configured your build tool (Babel plugin or unplugin)
 
-### Step 2: Deploy your changes
+## Step-by-Step Tutorial
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+<Steps>
+  <Step title="Create a configuration file">
+    Create a `saykit.config.ts` file in your project root:
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+    ```ts saykit.config.ts
+    import { defineConfig } from '@saykit/config';
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+    export default defineConfig({
+      sourceLocale: 'en',
+      locales: ['en', 'fr', 'es'],
+      buckets: [
+        {
+          include: ['src/**/*.{ts,tsx,js,jsx}'],
+          output: 'src/locales/{locale}/messages.{extension}',
+        },
+      ],
+    });
+    ```
 
-### Step 3: Go live
+    This configuration:
+    - Sets English as the source locale
+    - Defines three supported locales (English, French, Spanish)
+    - Scans all TypeScript and JavaScript files in `src/`
+    - Outputs extracted messages to `src/locales/{locale}/messages.json`
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+    <Note>
+      You can also use JSON format by creating `saykit.config.json` and omitting the `defineConfig` wrapper.
+    </Note>
+  </Step>
 
-## Next steps
+  <Step title="Initialize the Say instance">
+    Create a Say instance that will handle your translations:
 
-Now that you have your docs running, explore these key features:
+    <Tabs>
+      <Tab title="Vanilla JavaScript">
+        ```ts src/i18n.ts
+        import { Say } from 'saykit';
 
-<CardGroup cols={2}>
+        const say = new Say({
+          locales: ['en', 'fr', 'es'],
+          messages: {
+            en: await import('./locales/en/messages.json').then((m) => m.default),
+            fr: await import('./locales/fr/messages.json').then((m) => m.default),
+            es: await import('./locales/es/messages.json').then((m) => m.default),
+          },
+        });
 
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
+        // Activate the default locale
+        say.activate('en');
 
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
+        export default say;
+        ```
+      </Tab>
 
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
+      <Tab title="React (Next.js)">
+        ```ts src/i18n.ts
+        import 'server-only';
+        import { unstable_createWithSay } from '@saykit/react/server';
+        import { Say } from 'saykit';
 
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
+        const say = new Say({
+          locales: ['en', 'fr', 'es'],
+          messages: {
+            en: await import('./locales/en/messages.json').then((m) => m.default),
+            fr: await import('./locales/fr/messages.json').then((m) => m.default),
+            es: await import('./locales/es/messages.json').then((m) => m.default),
+          },
+        });
 
-</CardGroup>
+        export const withSay = unstable_createWithSay(say);
 
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
+        export default say;
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+
+  <Step title="Add translatable messages">
+    Use Saykit's template literal syntax to mark strings for translation:
+
+    <Tabs>
+      <Tab title="Vanilla JavaScript">
+        ```ts src/index.ts
+        import say from './i18n';
+
+        // Simple message
+        const greeting = say`Hello, World!`;
+        console.log(greeting); // "Hello, World!"
+
+        // Message with interpolation
+        const name = 'Alice';
+        const welcome = say`Welcome, ${name}!`;
+        console.log(welcome); // "Welcome, Alice!"
+
+        // Plural message
+        const count = 5;
+        const items = say.plural(count, {
+          one: 'You have 1 item',
+          other: 'You have # items',
+        });
+        console.log(items); // "You have 5 items"
+        ```
+      </Tab>
+
+      <Tab title="React">
+        ```tsx src/app/page.tsx
+        'use client';
+        import { Say } from '@saykit/react';
+
+        export default function HomePage() {
+          const name = 'Alice';
+
+          return (
+            <main>
+              <h1>
+                <Say>Hello, World!</Say>
+              </h1>
+              <p>
+                <Say>Welcome, {name}!</Say>
+              </p>
+            </main>
+          );
+        }
+        ```
+
+        For server components, wrap your component with `withSay`:
+
+        ```tsx src/app/[locale]/page.tsx
+        import { withSay } from '../../i18n';
+        import { Say } from '@saykit/react';
+
+        function HomePage({ params }: { params: Promise<{ locale: string }> }) {
+          return (
+            <main>
+              <Say>Hello from the server!</Say>
+            </main>
+          );
+        }
+
+        export default withSay(HomePage, (p) => p.params.then((p) => p.locale));
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+
+  <Step title="Extract messages">
+    Run the extract command to scan your source files and generate message catalogs:
+
+    ```bash
+    npx saykit extract
+    ```
+
+    This creates `.po` files for each locale in your output directory (e.g., `src/locales/en/messages.po`).
+
+    <Note>
+      The `.po` (Portable Object) format is an industry-standard format used by professional translation tools.
+    </Note>
+  </Step>
+
+  <Step title="Translate your messages">
+    Open the generated `.po` files and add translations:
+
+    <CodeGroup>
+
+    ```po src/locales/fr/messages.po
+    msgid "Hello, World!"
+    msgstr "Bonjour le monde!"
+
+    msgid "Welcome, {name}!"
+    msgstr "Bienvenue, {name}!"
+    ```
+
+    ```po src/locales/es/messages.po
+    msgid "Hello, World!"
+    msgstr "¡Hola, Mundo!"
+
+    msgid "Welcome, {name}!"
+    msgstr "¡Bienvenido, {name}!"
+    ```
+
+    </CodeGroup>
+  </Step>
+
+  <Step title="Compile translations">
+    Convert `.po` files to runtime-ready JSON:
+
+    ```bash
+    npx saykit compile
+    ```
+
+    This generates `messages.json` files that your application will load at runtime.
+  </Step>
+
+  <Step title="Switch locales">
+    Change the active locale to see your translations:
+
+    ```ts
+    import say from './i18n';
+
+    // Switch to French
+    say.activate('fr');
+    console.log(say`Hello, World!`); // "Bonjour le monde!"
+
+    // Switch to Spanish
+    say.activate('es');
+    console.log(say`Hello, World!`); // "¡Hola, Mundo!"
+    ```
+  </Step>
+</Steps>
+
+## CLI Commands Reference
+
+Saykit provides three main CLI commands:
+
+### `saykit extract`
+
+Scans your source files and extracts translatable messages into `.po` files.
+
+```bash
+npx saykit extract
+```
+
+Options:
+- `-v, --verbose` - Enable verbose logging
+- `-q, --quiet` - Suppress all logging
+
+### `saykit compile`
+
+Compiles `.po` translation files into runtime-ready JSON files.
+
+```bash
+npx saykit compile
+```
+
+Options:
+- `-v, --verbose` - Enable verbose logging
+- `-q, --quiet` - Suppress all logging
+
+### `saykit build`
+
+Combines extract and compile into a single step.
+
+```bash
+npx saykit build
+```
+
+Options:
+- `-v, --verbose` - Enable verbose logging
+- `-q, --quiet` - Suppress all logging
+
+<Tip>
+  Add these commands to your `package.json` scripts for easy access:
+
+  ```json package.json
+  {
+    "scripts": {
+      "i18n:extract": "saykit extract",
+      "i18n:compile": "saykit compile",
+      "i18n:build": "saykit build"
+    }
+  }
+  ```
+</Tip>
+
+## Next Steps
+
+Now that you have Saykit set up, explore more features:
+
+- [Configuration](/concepts/configuration) - Learn about all configuration options
+- [Core Concepts](/concepts/architecture) - Understand how Saykit works under the hood
+- [React Integration](/integrations/react) - Deep dive into React-specific features
+- [Message Formatting](/guides/pluralization) - Advanced pluralization, selection, and formatting

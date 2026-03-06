@@ -1,0 +1,98 @@
+---
+title: SayProvider
+description: React context provider for Saykit localization
+---
+
+`SayProvider` is a React context provider that makes a localized Say instance available to all descendant components in your component tree.
+
+<Note>
+  This is a **client component** that uses the `'use client'` directive. It can only be used in client-side React code.
+</Note>
+
+## Import
+
+```tsx
+import { SayProvider } from 'saykit/react';
+```
+
+## Props
+
+<ParamField path="locale" type="string" required>
+  The current locale code (e.g., `'en'`, `'fr'`, `'es'`).
+</ParamField>
+
+<ParamField path="messages" type="Say.Messages" required>
+  The translation messages object for the current locale. This should contain all the translation keys and their corresponding values.
+</ParamField>
+
+<ParamField path="children" type="ReactNode">
+  The child components that will have access to the Say instance via the `useSay()` hook.
+</ParamField>
+
+## Usage
+
+Wrap your component tree with `SayProvider` to make translations available to all descendant components:
+
+```tsx
+'use client';
+
+import { SayProvider } from 'saykit/react';
+import messages from './locales/en.json';
+
+export function App() {
+  return (
+    <SayProvider locale="en" messages={messages}>
+      <YourComponents />
+    </SayProvider>
+  );
+}
+```
+
+### With dynamic locale switching
+
+```tsx
+'use client';
+
+import { SayProvider } from 'saykit/react';
+import { useState } from 'react';
+import enMessages from './locales/en.json';
+import frMessages from './locales/fr.json';
+
+const locales = {
+  en: enMessages,
+  fr: frMessages,
+};
+
+export function App() {
+  const [locale, setLocale] = useState<'en' | 'fr'>('en');
+
+  return (
+    <SayProvider locale={locale} messages={locales[locale]}>
+      <button onClick={() => setLocale(locale === 'en' ? 'fr' : 'en')}>
+        Switch to {locale === 'en' ? 'French' : 'English'}
+      </button>
+      <YourComponents />
+    </SayProvider>
+  );
+}
+```
+
+## How it works
+
+The `SayProvider` component:
+
+1. Creates a `Say` instance with the provided locale and messages
+2. Immediately loads and activates the locale
+3. Freezes the instance to create a `ReadonlySay` object
+4. Provides the instance via React Context to all descendant components
+
+Components within the provider can access the Say instance using the [`useSay()`](/api/react/use-say) hook.
+
+## Type Definition
+
+```tsx
+function SayProvider(props: PropsWithChildren<{
+  locale: string;
+  messages: Say.Messages;
+}>): JSX.Element;
+```

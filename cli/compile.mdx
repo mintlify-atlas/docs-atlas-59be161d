@@ -1,0 +1,158 @@
+---
+title: 'saykit compile'
+description: 'Compile translation files into runtime-ready locale bundles'
+---
+
+## Overview
+
+The `compile` command transforms your translation files into optimized runtime formats that your application can load. It reads translation files, applies fallback logic, and generates JSON files with key-value pairs for fast lookup.
+
+## Syntax
+
+```bash
+saykit compile [options]
+```
+
+## Options
+
+<ParamField path="-v, --verbose" type="boolean" default="false">
+  Enable verbose logging to see detailed compilation progress for each locale.
+</ParamField>
+
+<ParamField path="-q, --quiet" type="boolean" default="false">
+  Suppress all logging output. Only errors will be displayed.
+</ParamField>
+
+## How It Works
+
+The compile command uses the `BucketCompileWorker` to:
+
+### 1. Read Translation Files
+
+For each locale in your configuration:
+- Reads the translation file using the configured formatter (e.g., `.po` files)
+- Parses messages into structured data with IDs, translations, and metadata
+
+### 2. Apply Fallback Translations
+
+For messages missing translations:
+- Checks the fallback chain defined in `fallbackLocales` configuration
+- Falls back to the source locale if no translation is found in fallbacks
+- Ensures every message has a displayable value
+
+### 3. Generate Runtime Files
+
+Creates optimized JSON files:
+- **Key-value format**: Maps message IDs/hashes to translated strings
+- **Compact structure**: Only includes the data needed at runtime
+- **Fast lookup**: Enables O(1) message retrieval in your application
+
+## Output Format
+
+The compiled files are JSON objects with this structure:
+
+```json
+{
+  "welcome.message": "Welcome to our app!",
+  "button.submit": "Submit",
+  "error.required": "This field is required",
+  "8a3f2e1b": "Hello {name}!"
+}
+```
+
+Keys are either:
+- **Explicit IDs**: The `id` field from your message definition
+- **Generated hashes**: Computed from the message content and context
+
+## Examples
+
+### Basic compilation
+
+```bash
+saykit compile
+```
+
+**Output:**
+```
+🛠 Compiling Translations
+Compiling bucket: ["src/**/*.{ts,tsx}"]
+Compiling locale: en
+Writing runtime file for en
+Compiling locale: es
+Writing runtime file for es
+Compiling locale: fr
+Writing runtime file for fr
+Compilation complete for bucket: ["src/**/*.{ts,tsx}"]
+```
+
+### Verbose compilation
+
+```bash
+saykit compile --verbose
+```
+
+Shows detailed information about each locale being compiled and the number of translations processed.
+
+### Quiet compilation
+
+```bash
+saykit compile --quiet
+```
+
+Runs silently with no output unless errors occur.
+
+## Output Files
+
+Compiled files use the same `output` pattern as extraction, but with a `.json` extension:
+
+```typescript
+{
+  buckets: [{
+    output: "locales/{locale}.{extension}"
+  }]
+}
+```
+
+Produces:
+- `locales/en.json` (runtime format)
+- `locales/es.json` (runtime format)
+- `locales/fr.json` (runtime format)
+
+These are separate from the source translation files (e.g., `.po` files) used by translators.
+
+## Fallback Logic
+
+The compiler implements intelligent fallback:
+
+```typescript
+{
+  sourceLocale: "en",
+  locales: ["en", "es", "es-MX", "fr"],
+  fallbackLocales: {
+    "es-MX": ["es"],
+    "fr": ["en"]
+  }
+}
+```
+
+For locale `es-MX`:
+1. First tries the `es-MX` translation
+2. Falls back to `es` if missing
+3. Falls back to `en` (source locale) as last resort
+
+<Tip>
+Run `compile` after updating translations to regenerate your runtime bundles.
+</Tip>
+
+<Note>
+The compile command caches translations during execution for efficiency when processing multiple locales with shared fallbacks.
+</Note>
+
+## When to Use
+
+Run `saykit compile` in these scenarios:
+
+- After translators update your `.po` or other source translation files
+- Before deploying your application to production
+- As part of your build pipeline (though consider using `saykit build` instead)
+- When changing fallback locale configuration

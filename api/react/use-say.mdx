@@ -1,0 +1,132 @@
+---
+title: useSay
+description: React hook to access the Say instance from context
+---
+
+`useSay()` is a React hook that retrieves the current `ReadonlySay` instance from the nearest `SayProvider` in the component tree.
+
+<Note>
+  This hook must be called within a component that is a descendant of [`SayProvider`](/api/react/say-provider). It will throw an error if no provider is found.
+</Note>
+
+## Import
+
+```tsx
+import { useSay } from 'saykit/react';
+```
+
+## Return Type
+
+<ResponseField name="say" type="ReadonlySay">
+  A frozen (read-only) Say instance that provides translation methods. The instance is bound to the locale and messages provided by the nearest `SayProvider`.
+</ResponseField>
+
+## Usage
+
+### Basic translation
+
+```tsx
+'use client';
+
+import { useSay } from 'saykit/react';
+
+export function WelcomeMessage() {
+  const say = useSay();
+
+  return (
+    <div>
+      <h1>{say('welcome.title')}</h1>
+      <p>{say('welcome.description')}</p>
+    </div>
+  );
+}
+```
+
+### With interpolation
+
+```tsx
+'use client';
+
+import { useSay } from 'saykit/react';
+
+export function UserGreeting({ username }: { username: string }) {
+  const say = useSay();
+
+  return (
+    <p>{say('greeting.hello', { name: username })}</p>
+  );
+}
+```
+
+### With pluralization
+
+```tsx
+'use client';
+
+import { useSay } from 'saykit/react';
+
+export function ItemCount({ count }: { count: number }) {
+  const say = useSay();
+
+  return (
+    <p>{say('items.count', { count })}</p>
+  );
+}
+```
+
+## Error Handling
+
+If `useSay()` is called outside of a `SayProvider`, it will throw an error:
+
+```tsx
+'use client';
+
+import { useSay } from 'saykit/react';
+
+// This will throw an error!
+export function BrokenComponent() {
+  const say = useSay(); // Error: 'useSay' must be used within a 'SayProvider'
+  
+  return <div>{say('some.key')}</div>;
+}
+```
+
+**Error message:**
+```
+Error: 'useSay' must be used within a 'SayProvider'
+```
+
+### Proper setup
+
+Always ensure your components using `useSay()` are wrapped with `SayProvider`:
+
+```tsx
+'use client';
+
+import { SayProvider, useSay } from 'saykit/react';
+import messages from './locales/en.json';
+
+function TranslatedComponent() {
+  const say = useSay(); // This works!
+  return <div>{say('some.key')}</div>;
+}
+
+export function App() {
+  return (
+    <SayProvider locale="en" messages={messages}>
+      <TranslatedComponent />
+    </SayProvider>
+  );
+}
+```
+
+## Type Definition
+
+```tsx
+function useSay(): ReadonlySay;
+```
+
+## See Also
+
+- [`SayProvider`](/api/react/say-provider) - The context provider that must wrap components using this hook
+- [Say API](/api/say-class) - Core Say class documentation for available methods

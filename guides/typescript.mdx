@@ -1,0 +1,485 @@
+---
+title: TypeScript
+description: Type-safe internationalization with full TypeScript support
+---
+
+Saykit is built with TypeScript and provides comprehensive type safety throughout your internationalization workflow.
+
+## Type-Safe Configuration
+
+Use `defineConfig` to get full type checking and autocomplete for your configuration:
+
+```typescript saykit.config.ts
+import { defineConfig } from '@saykit/config';
+
+export default defineConfig({
+  sourceLocale: 'en',
+  locales: ['en', 'fr', 'es', 'de'],
+  buckets: [
+    {
+      include: ['src/**/*.{ts,tsx}'],
+      output: 'src/locales/{locale}/messages.{extension}',
+    },
+  ],
+});
+```
+
+### Configuration Validation
+
+`defineConfig` validates your configuration at compile time:
+
+```typescript
+// ✅ Valid
+defineConfig({
+  sourceLocale: 'en',
+  locales: ['en', 'fr'],  // sourceLocale must be first
+  buckets: [{ /* ... */ }],
+});
+
+// ❌ Error: sourceLocale must match first locale
+defineConfig({
+  sourceLocale: 'en',
+  locales: ['fr', 'en'],  // Error!
+  buckets: [{ /* ... */ }],
+});
+
+// ❌ Error: buckets is required
+defineConfig({
+  sourceLocale: 'en',
+  locales: ['en', 'fr'],
+  // Missing buckets!
+});
+```
+
+## Type-Safe Say Instance
+
+The `Say` class is generic over locale types and loader functions:
+
+```typescript
+import { Say } from '@saykit/integration';
+
+// Define your locales as a union type
+type Locale = 'en' | 'fr' | 'es';
+
+// Define a loader function
+const loader = async (locale: Locale) => {
+  const module = await import(`./locales/${locale}/messages.po`);
+  return module.default;
+};
+
+// Create a type-safe Say instance
+const say = new Say<Locale, typeof loader>({
+  locales: ['en', 'fr', 'es'],
+  loader,
+});
+```
+
+### Generic Type Parameters
+
+<Accordion title="Say<Locale, Loader>">
+  ```typescript
+  class Say<
+    Locale extends string = string,
+    Loader extends Say.Loader<Locale> | undefined = Say.Loader<Locale> | undefined
+  >
+  ```
+  
+  **Locale**: A string literal union of supported locales
+  - Provides autocomplete for locale selection
+  - Validates locale parameters at compile time
+  
+  **Loader**: The loader function type (or undefined)
+  - Infers return type for `load()` method
+  - Ensures type consistency between configuration and usage
+</Accordion>
+
+### Type Inference
+
+TypeScript automatically infers the correct types:
+
+```typescript
+type Locale = 'en' | 'fr' | 'es';
+
+const say = new Say<Locale, typeof loader>({
+  locales: ['en', 'fr', 'es'],
+  loader,
+});
+
+// ✅ Valid: 'en' is in Locale union
+await say.load('en');
+
+// ❌ Error: 'de' is not in Locale union
+await say.load('de');
+
+// ✅ Valid: activate accepts Locale
+say.activate('fr');
+
+// ❌ Error: 'ja' is not in Locale union
+say.activate('ja');
+
+// Type inference for locale property
+const currentLocale: Locale = say.locale;
+```
+
+## Type-Safe Messages
+
+The `Say` interface uses template literal types for compile-time message validation:
+
+```typescript
+// Basic message
+say`Hello, ${name}!`;
+
+// With descriptor
+say({ context: 'greeting' })`Hello, ${name}!`;
+say({ id: 'home.greeting' })`Hello, ${name}!`;
+
+// Type error: invalid descriptor property
+say({ invalidProp: 'value' })`Hello!`; // ❌
+```
+
+## Pluralization Types
+
+Pluralization methods enforce CLDR compliance:
+
+```typescript
+import type { NumeralOptions, SelectOptions } from '@saykit/integration';
+
+// ✅ Valid: includes required 'other'
+say.plural(count, {
+  one: '# item',
+  other: '# items',
+});
+
+// ❌ Error: missing required 'other'
+say.plural(count, {
+  one: '# item',
+  // Missing 'other'!
+});
+
+// ✅ Valid: optional CLDR categories
+say.plural(count, {
+  zero: 'No items',
+  one: '# item',
+  few: '# items',
+  many: '# items',
+  other: '# items',
+});
+
+// ✅ Valid: exact number matches
+say.plural(count, {
+  0: 'Empty',
+  1: 'One',
+  other: '# items',
+});
+```
+
+### NumeralOptions Type
+
+```typescript
+interface NumeralOptions {
+  zero?: string;
+  one?: string;
+  two?: string;
+  few?: string;
+  many?: string;
+  other: string;        // Required!
+  [digit: number]: string;  // Exact matches
+}
+```
+
+### SelectOptions Type
+
+```typescript
+interface SelectOptions {
+  other: string;        // Required fallback
+  [match: string | number]: string;
+}
+
+// ✅ Valid
+say.select(status, {
+  active: 'Active user',
+  inactive: 'Inactive user',
+  other: 'Unknown status',
+});
+
+// ❌ Error: missing 'other'
+say.select(status, {
+  active: 'Active',
+  inactive: 'Inactive',
+});
+```
+
+## Loader Types
+
+Define type-safe loader functions:
+
+```typescript
+import type { Say } from '@saykit/integration';
+
+// Synchronous loader
+const syncLoader: Say.Loader<'en' | 'fr'> = (locale) => {
+  if (locale === 'en') return enMessages;
+  if (locale === 'fr') return frMessages;
+  return {};
+};
+
+// Asynchronous loader
+const asyncLoader: Say.Loader<'en' | 'fr'> = async (locale) => {
+  const module = await import(`./locales/${locale}.json`);
+  return module.default;
+};
+
+// Type for messages
+type Messages = Say.Messages;
+// Equivalent to: { [key: string]: string }
+```
+
+## Configuration Types
+
+Import types for advanced configuration:
+
+```typescript
+import type {
+  Configuration,
+  Bucket,
+  Formatter,
+  Message,
+} from '@saykit/config';
+
+// Custom formatter with types
+const myFormatter: Formatter = {
+  extension: 'json',
+  
+  async parse(content: string, context: { locale: string }): Promise<Message[]> {
+    const data = JSON.parse(content);
+    return Object.entries(data).map(([id, message]) => ({
+      id,
+      message: message as string,
+      translation: message as string,
+      comments: [],
+      references: [],
+    }));
+  },
+  
+  async stringify(messages: Message[], context: { locale: string }): Promise<string> {
+    const data = Object.fromEntries(
+      messages.map(m => [m.id || m.message, m.translation || m.message])
+    );
+    return JSON.stringify(data, null, 2);
+  },
+};
+
+// Type-safe bucket configuration
+const bucket: Bucket = {
+  include: ['src/**/*.tsx'],
+  exclude: ['src/**/*.test.tsx'],
+  output: 'locales/{locale}.{extension}',
+  formatter: myFormatter,
+  match: () => false,  // Generated by zod transform
+};
+```
+
+### Message Type
+
+```typescript
+interface Message {
+  message: string;        // Source text
+  translation?: string;   // Translated text
+  id?: string;           // Custom identifier
+  context?: string;      // Disambiguation context
+  comments: string[];    // Translator notes
+  references: string[];  // File locations
+}
+```
+
+## Immutable Types
+
+The `freeze()` method returns a readonly version:
+
+```typescript
+import type { ReadonlySay } from '@saykit/integration';
+
+const say = new Say({ /* ... */ });
+const frozenSay = say.freeze();
+
+// ✅ Valid: read operations
+frozenSay.locale;
+frozenSay.messages;
+const result = frozenSay.call({ id: 'greeting' });
+
+// ❌ Error: mutation methods are removed
+frozenSay.activate('fr');     // Error!
+frozenSay.load('en');         // Error!
+frozenSay.assign('en', {});   // Error!
+```
+
+### ReadonlySay Type
+
+```typescript
+type ReadonlySay<Locale, Loader> = Omit<
+  Say<Locale, Loader>,
+  'activate' | 'load' | 'assign'
+>;
+```
+
+## Utility Types
+
+Saykit exports helpful utility types:
+
+```typescript
+import type { Tuple, Disallow, Awaitable } from '@saykit/integration';
+
+// Tuple: Non-empty array type
+type MyTuple = Tuple;  // [any, ...any[]]
+
+// Disallow: Prevent specific properties
+type OptionsWithoutId = Disallow<NumeralOptions, 'id' | 'context'>;
+
+// Awaitable: Value or Promise
+type MaybeAsync<T> = Awaitable<T>;  // T | PromiseLike<T>
+```
+
+## Type-Safe Iteration
+
+The `Say` class provides type-safe iteration:
+
+```typescript
+type Locale = 'en' | 'fr' | 'es';
+const say = new Say<Locale, typeof loader>({ /* ... */ });
+
+// Using for...of
+for (const [instance, locale] of say) {
+  // instance: Say<Locale, typeof loader>
+  // locale: Locale
+  console.log(`${locale}: ${instance.locale}`);
+}
+
+// Using map
+const results = say.map(([instance, locale]) => {
+  return { locale, count: Object.keys(instance.messages).length };
+});
+// results: { locale: Locale, count: number }[]
+
+// Using reduce
+const total = say.reduce((sum, [instance, locale]) => {
+  return sum + Object.keys(instance.messages).length;
+}, 0);
+// total: number
+```
+
+## Strict Mode
+
+Enable strict TypeScript checks for maximum safety:
+
+```json tsconfig.json
+{
+  "compilerOptions": {
+    "strict": true,
+    "strictNullChecks": true,
+    "noImplicitAny": true,
+    "noImplicitThis": true,
+    "strictFunctionTypes": true
+  }
+}
+```
+
+Saykit is fully compatible with all strict mode flags.
+
+## Type Exports
+
+Import only types when needed:
+
+```typescript
+// Import types
+import type {
+  Say,
+  ReadonlySay,
+  NumeralOptions,
+  SelectOptions,
+} from '@saykit/integration';
+
+import type {
+  Configuration,
+  Bucket,
+  Formatter,
+  Message,
+} from '@saykit/config';
+
+// Import values
+import { Say } from '@saykit/integration';
+import { defineConfig } from '@saykit/config';
+```
+
+<Note>
+  Using `import type` ensures that type imports are erased during compilation and don't affect bundle size.
+</Note>
+
+## Framework Integration
+
+Type-safe patterns for popular frameworks:
+
+### React
+
+```typescript
+import { Say } from '@saykit/integration';
+import { createContext, useContext } from 'react';
+
+type Locale = 'en' | 'fr' | 'es';
+type SayInstance = Say<Locale, typeof loader>;
+
+const SayContext = createContext<SayInstance | null>(null);
+
+export function useSay(): SayInstance {
+  const say = useContext(SayContext);
+  if (!say) throw new Error('Say context not found');
+  return say;
+}
+
+// Usage
+function MyComponent() {
+  const say = useSay();
+  return <p>{say`Hello, ${user.name}!`}</p>;
+}
+```
+
+### Next.js
+
+```typescript
+import type { GetServerSideProps } from 'next';
+import { Say } from '@saykit/integration';
+
+type Locale = 'en' | 'fr';
+
+export const getServerSideProps: GetServerSideProps = async ({ locale }) => {
+  const say = new Say<Locale, typeof loader>({
+    locales: ['en', 'fr'],
+    loader,
+  });
+  
+  await say.load(locale as Locale);
+  say.activate(locale as Locale);
+  
+  return {
+    props: {
+      messages: say.messages,
+      locale: say.locale,
+    },
+  };
+};
+```
+
+## Best Practices
+
+1. **Define Locale Types**: Use string literal unions for locales
+2. **Use defineConfig**: Always wrap configuration for type safety
+3. **Infer Loader Types**: Let TypeScript infer from your loader function
+4. **Avoid Type Assertions**: Let type inference work for you
+5. **Export Types**: Share types between configuration and runtime code
+6. **Enable Strict Mode**: Catch errors at compile time
+7. **Use ReadonlySay**: Freeze instances to prevent accidental mutations
+
+## Next Steps
+
+- Learn about [Message Extraction](/guides/message-extraction) with type-safe configuration
+- Explore [Pluralization](/guides/pluralization) with type-checked CLDR categories
+- See [Custom Formatters](/guides/custom-formatters) for type-safe formatter implementation

@@ -1,0 +1,155 @@
+---
+title: Introduction
+description: Framework-agnostic i18n translation framework with compile-time message extraction and type-safe configuration
+---
+
+# Welcome to Saykit
+
+Saykit is a modern, framework-agnostic internationalization (i18n) framework that brings compile-time message extraction and type-safe configuration to your applications.
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get up and running with Saykit in minutes
+  </Card>
+  <Card title="Core Concepts" icon="book" href="/concepts/architecture">
+    Learn about Saykit's architecture and design
+  </Card>
+  <Card title="React Integration" icon="react" href="/integrations/react">
+    Use Saykit with React applications
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/say-class">
+    Explore the complete API documentation
+  </Card>
+</CardGroup>
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Template Literal Syntax" icon="brackets-curly">
+    Define messages using intuitive template literal syntax with compile-time macro expansion
+  </Card>
+  <Card title="Compile-Time Extraction" icon="wand-magic-sparkles">
+    Automatically extract translatable messages from your source code during build
+  </Card>
+  <Card title="Framework Agnostic" icon="puzzle-piece">
+    Works with React, Next.js, and any JavaScript framework or vanilla JS
+  </Card>
+  <Card title="ICU MessageFormat" icon="language">
+    Full support for pluralization, ordinals, and select messages using ICU standards
+  </Card>
+  <Card title="Type-Safe Configuration" icon="shield-check">
+    Zod-powered configuration schema with full TypeScript support
+  </Card>
+  <Card title="Flexible Formats" icon="file-code">
+    Built-in PO file support with extensible custom formatter API
+  </Card>
+</CardGroup>
+
+## How It Works
+
+Saykit uses a macro-based approach to define translatable messages directly in your source code:
+
+```typescript
+import { Say } from 'saykit';
+
+const say = new Say({
+  locales: ['en', 'fr'],
+  messages: {
+    en: { 'greeting': 'Hello, {name}!' },
+    fr: { 'greeting': 'Bonjour, {name}!' }
+  }
+});
+
+say.activate('en');
+
+// Use template literals with compile-time transformation
+const message = say`Hello, ${name}!`;
+```
+
+During build, Saykit's Babel plugin extracts these messages and generates translation files in your preferred format (PO, JSON, etc.).
+
+## Why Saykit?
+
+<AccordionGroup>
+  <Accordion title="Better Developer Experience">
+    Write messages inline using familiar template literal syntax. No more hunting for translation keys or managing separate locale files manually.
+  </Accordion>
+  
+  <Accordion title="Compile-Time Safety">
+    Catch missing translations and format errors during build time, not runtime. Saykit extracts messages from your code and validates them before deployment.
+  </Accordion>
+  
+  <Accordion title="Framework Flexibility">
+    Use Saykit with any JavaScript framework or none at all. The core runtime has zero dependencies, and framework integrations are opt-in.
+  </Accordion>
+  
+  <Accordion title="Standards-Based">
+    Built on ICU MessageFormat for pluralization and formatting, ensuring compatibility with industry-standard translation tools and workflows.
+  </Accordion>
+</AccordionGroup>
+
+## Quick Example
+
+Here's a complete example showing pluralization with Saykit:
+
+```typescript
+import { Say } from 'saykit';
+
+const say = new Say({
+  locales: ['en', 'fr'],
+  messages: {
+    en: {
+      'cart-items': '{count, plural, =0 {No items} one {# item} other {# items}} in cart'
+    },
+    fr: {
+      'cart-items': '{count, plural, =0 {Aucun article} one {# article} other {# articles}} dans le panier'
+    }
+  }
+});
+
+say.activate('en');
+
+// Use the plural macro
+console.log(say.plural(0, { 
+  0: 'No items', 
+  one: '# item', 
+  other: '# items' 
+}));
+// Output: "No items in cart"
+```
+
+## Next Steps
+
+<Steps>
+  <Step title="Install Saykit">
+    Add Saykit to your project using your preferred package manager
+    
+    [Installation Guide →](/installation)
+  </Step>
+  
+  <Step title="Configure Your Project">
+    Set up your `saykit.config.ts` file to define locales and message extraction rules
+    
+    [Configuration Guide →](/concepts/configuration)
+  </Step>
+  
+  <Step title="Add a Framework Integration">
+    Install the React, Babel, or unplugin integration for your build setup
+    
+    [Integrations →](/integrations/react)
+  </Step>
+  
+  <Step title="Extract and Compile Messages">
+    Use the CLI tools to extract messages and compile translations
+    
+    [CLI Reference →](/cli/extract)
+  </Step>
+</Steps>
+
+## Community and Support
+
+Saykit is an open-source project. Contributions, issues, and feedback are welcome on [GitHub](https://github.com/k0d13/saykit).
+
+<Note>
+  Saykit is currently in active development (WIP). APIs may change before the stable 1.0 release.
+</Note>

@@ -1,0 +1,375 @@
+---
+title: Babel Plugin
+description: Transform Saykit messages at build time with the Babel plugin
+---
+
+The `@saykit/babel-plugin` automatically extracts and transforms internationalized messages from your code at build time.
+
+## Installation
+
+```bash
+npm install --save-dev @saykit/babel-plugin
+```
+
+## Configuration
+
+### Using .babelrc
+
+Add the plugin to your `.babelrc` file:
+
+```json .babelrc
+{
+  "presets": ["next/babel"],
+  "plugins": ["@saykit/babel-plugin"]
+}
+```
+
+### Using babel.config.js
+
+```js babel.config.js
+module.exports = {
+  presets: ['@babel/preset-env', '@babel/preset-react'],
+  plugins: ['@saykit/babel-plugin'],
+};
+```
+
+### Using babel.config.json
+
+```json babel.config.json
+{
+  "presets": ["@babel/preset-env", "@babel/preset-react"],
+  "plugins": ["@saykit/babel-plugin"]
+}
+```
+
+## What It Transforms
+
+The Babel plugin transforms two types of expressions:
+
+1. **JSX Elements**: `<Say>` components and their variants (`Say.Plural`, `Say.Ordinal`, `Say.Select`)
+2. **Template Literals**: Tagged template literals using `say.t` or `t`
+
+### Supported File Extensions
+
+The plugin processes files with the following extensions:
+
+- `.js`, `.cjs`, `.mjs`
+- `.jsx`
+- `.ts`, `.cts`, `.mts`
+- `.tsx`
+
+## Transformation Examples
+
+### JSX Element Transformation
+
+<CodeGroup>
+
+```tsx Before
+import { Say } from '@saykit/react';
+
+function Welcome({ userName }) {
+  return (
+    <Say>
+      Welcome, <strong>{userName}</strong>!
+    </Say>
+  );
+}
+```
+
+```tsx After
+import { Say } from '@saykit/react';
+
+function Welcome({ userName }) {
+  return (
+    <Say 
+      id="a8f3c2d1" 
+      userName={<strong>{userName}</strong>}
+    />
+  );
+}
+```
+
+</CodeGroup>
+
+The plugin:
+- Extracts the message content
+- Generates a unique hash ID (`a8f3c2d1`) based on the message
+- Converts child elements into props
+- Replaces the original JSX with a descriptor
+
+### Pluralization Transformation
+
+<CodeGroup>
+
+```tsx Before
+import { Say } from '@saykit/react';
+
+function ItemCount({ count }) {
+  return (
+    <Say.Plural
+      _={count}
+      _0="No items"
+      one="One item"
+      other="# items"
+    />
+  );
+}
+```
+
+```tsx After
+import { Say } from '@saykit/react';
+
+function ItemCount({ count }) {
+  return (
+    <Say
+      id="b9e4d3c2"
+      _={count}
+    />
+  );
+}
+```
+
+</CodeGroup>
+
+### Ordinal Transformation
+
+<CodeGroup>
+
+```tsx Before
+<Say.Ordinal
+  _={position}
+  _1="#st"
+  _2="#nd"
+  _3="#rd"
+  other="#th"
+/>
+```
+
+```tsx After
+<Say
+  id="c1f5e4d3"
+  _={position}
+/>
+```
+
+</CodeGroup>
+
+### Select Transformation
+
+<CodeGroup>
+
+```tsx Before
+<Say.Select
+  _={gender}
+  male="He is online"
+  female="She is online"
+  other="They are online"
+/>
+```
+
+```tsx After
+<Say
+  id="d2g6f5e4"
+  _={gender}
+/>
+```
+
+</CodeGroup>
+
+### Template Literal Transformation
+
+<CodeGroup>
+
+```ts Before
+import { say } from './i18n';
+
+const greeting = say.t`Hello, ${userName}!`;
+```
+
+```ts After
+import { say } from './i18n';
+
+const greeting = say.t({
+  id: "e3h7g6f5",
+  userName,
+});
+```
+
+</CodeGroup>
+
+## How It Works
+
+<Steps>
+  <Step title="Parsing">
+    The plugin parses your source code using Babel's parser with TypeScript and JSX support enabled.
+  </Step>
+  
+  <Step title="Traversal">
+    It traverses the Abstract Syntax Tree (AST) looking for:
+    - JSX elements named `Say`, `Say.Plural`, `Say.Ordinal`, or `Say.Select`
+    - Tagged template literals
+  </Step>
+  
+  <Step title="Message Extraction">
+    For each match, it:
+    - Extracts the message content and structure
+    - Identifies variables and components used within the message
+    - Generates a unique hash ID based on the message content
+  </Step>
+  
+  <Step title="Code Generation">
+    The plugin replaces the original code with:
+    - A descriptor object containing the message ID
+    - Props for any variables or components
+  </Step>
+</Steps>
+
+## Message Hash Generation
+
+The plugin generates stable, deterministic hash IDs for messages using SHA-256:
+
+- Same message content → Same hash ID
+- Different content → Different hash ID
+- Ensures consistency across builds
+- Allows safe refactoring without breaking translations
+
+```tsx
+// These will have the same ID
+<Say>Hello, world!</Say>
+<Say>Hello, world!</Say>
+
+// This will have a different ID
+<Say>Hello, there!</Say>
+```
+
+## Programmatic Usage
+
+You can use the plugin programmatically for advanced use cases:
+
+```ts
+import { transformCode, collectMessages } from '@saykit/babel-plugin/core';
+
+// Transform code
+const transformed = transformCode('file.tsx', sourceCode);
+
+// Extract messages without transformation
+const messages = collectMessages('file.tsx', sourceCode);
+```
+
+### transformCode
+
+Transforms source code and returns the modified code:
+
+```ts
+function transformCode(id: string, code: string): string
+```
+
+<ParamField path="id" type="string" required>
+  File path or identifier (used for extension checking)
+</ParamField>
+
+<ParamField path="code" type="string" required>
+  Source code to transform
+</ParamField>
+
+### collectMessages
+
+Extracts messages without transforming the code:
+
+```ts
+function collectMessages(id: string, code: string): Message[]
+```
+
+<ParamField path="id" type="string" required>
+  File path or identifier
+</ParamField>
+
+<ParamField path="code" type="string" required>
+  Source code to analyze
+</ParamField>
+
+## Integration Examples
+
+### Next.js with Babel
+
+Next.js uses Babel by default. Simply add the plugin to `.babelrc`:
+
+```json .babelrc
+{
+  "presets": ["next/babel"],
+  "plugins": ["@saykit/babel-plugin"]
+}
+```
+
+<Note>
+  Next.js 13+ uses SWC by default, which doesn't support Babel plugins. To use this plugin with Next.js 13+, you need to disable SWC or use the [unplugin](/integrations/unplugin) instead.
+</Note>
+
+### Create React App
+
+CRA doesn't expose Babel configuration by default. You'll need to either:
+
+1. Eject the configuration
+2. Use a tool like `react-app-rewired`
+3. Use the [unplugin](/integrations/unplugin) with a custom webpack config
+
+### Gatsby
+
+Add to your `gatsby-config.js`:
+
+```js gatsby-config.js
+module.exports = {
+  plugins: [
+    {
+      resolve: 'gatsby-plugin-babel',
+      options: {
+        plugins: ['@saykit/babel-plugin'],
+      },
+    },
+  ],
+};
+```
+
+### Standalone Babel
+
+Use with the Babel CLI:
+
+```bash
+npm install --save-dev @babel/cli @babel/core @saykit/babel-plugin
+```
+
+```bash
+babel src --out-dir dist --plugins @saykit/babel-plugin
+```
+
+## Limitations
+
+<Warning>
+  The plugin requires a Babel-based build pipeline. If you're using:
+  - **Vite**: Use the [unplugin](/integrations/unplugin) instead
+  - **esbuild**: Use the [unplugin](/integrations/unplugin) instead
+  - **SWC**: Use the [unplugin](/integrations/unplugin) instead
+</Warning>
+
+## Troubleshooting
+
+### Plugin not running
+
+Ensure your build tool is using Babel. Some tools (like Vite) don't use Babel by default.
+
+### Transformations not applied
+
+Check that:
+1. The plugin is in your Babel configuration
+2. Your file extension is supported
+3. You're importing `Say` from `@saykit/react`
+
+### Hash IDs changing unexpectedly
+
+Hash IDs are based on message content. Even small changes (whitespace, formatting) will generate new IDs.
+
+## See Also
+
+- [React Integration](/integrations/react) - Learn about the Say component
+- [Unplugin](/integrations/unplugin) - Alternative for non-Babel build tools
+- [Message Extraction](/guides/message-extraction) - Understanding the extraction process

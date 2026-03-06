@@ -1,0 +1,406 @@
+---
+title: React Integration
+description: Use Saykit with React through SayProvider, useSay, and the Say component
+---
+
+The `@saykit/react` package provides React-specific utilities for using Saykit in both client and server components.
+
+## Installation
+
+```bash
+npm install @saykit/react saykit
+```
+
+## Package Exports
+
+The package provides conditional exports for client and server environments:
+
+- **Default import** (`@saykit/react`): Automatically resolves to client or server based on React's export conditions
+- **Client import** (`@saykit/react/client`): Explicitly import client-only utilities
+- **Server import** (`@saykit/react/server`): Explicitly import server-only utilities
+
+## Client Components
+
+### SayProvider
+
+Wrap your client component tree with `SayProvider` to provide a localized Say instance via React context.
+
+```tsx
+import { SayProvider } from '@saykit/react/client';
+import type { Say } from 'saykit';
+
+function RootLayout({ 
+  locale, 
+  messages, 
+  children 
+}: { 
+  locale: string; 
+  messages: Say.Messages; 
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang={locale}>
+      <body>
+        <SayProvider locale={locale} messages={messages}>
+          {children}
+        </SayProvider>
+      </body>
+    </html>
+  );
+}
+```
+
+#### Props
+
+<ParamField path="locale" type="string" required>
+  The current locale (e.g., `"en"`, `"fr"`)
+</ParamField>
+
+<ParamField path="messages" type="Say.Messages" required>
+  The messages object for the current locale
+</ParamField>
+
+<ParamField path="children" type="React.ReactNode">
+  Child components that will have access to the Say instance
+</ParamField>
+
+### useSay
+
+Access the Say instance from any client component within a `SayProvider`.
+
+```tsx
+'use client';
+
+import { useSay } from '@saykit/react/client';
+
+function MyComponent() {
+  const say = useSay();
+  
+  return <p>{say.t({ id: 'greeting' })}</p>;
+}
+```
+
+<Note>
+  `useSay` must be called within a component wrapped by `SayProvider`, or it will throw an error.
+</Note>
+
+### Say Component (Client)
+
+Use the `Say` component in client components for automatic message extraction:
+
+```tsx
+'use client';
+
+import { Say } from '@saykit/react';
+import { useState } from 'react';
+
+export default function ClientComponent() {
+  const [count, setCount] = useState(0);
+  
+  return (
+    <div>
+      <Say>
+        Hello from the <strong>client</strong>
+      </Say>
+      
+      <Say.Plural
+        _={count}
+        one="You have # item"
+        other="You have # items"
+      />
+    </div>
+  );
+}
+```
+
+## Server Components
+
+### setSay
+
+Set the Say instance for server components using `setSay`. This must be called before any `getSay` calls.
+
+```tsx
+import { setSay } from '@saykit/react/server';
+import { Say } from 'saykit';
+
+const say = new Say({
+  locales: ['en', 'fr'],
+  messages: {
+    en: await import('./locales/en/messages.json'),
+    fr: await import('./locales/fr/messages.json'),
+  },
+});
+
+await say.load('en');
+say.activate('en');
+setSay(say);
+```
+
+### getSay
+
+Retrieve the current Say instance in server components:
+
+```tsx
+import { getSay } from '@saykit/react/server';
+
+export default function ServerComponent() {
+  const say = getSay();
+  
+  return <p>{say.t({ id: 'greeting' })}</p>;
+}
+```
+
+### Say Component (Server)
+
+The `Say` component works seamlessly in server components:
+
+```tsx
+import { Say } from '@saykit/react';
+
+export default function ServerComponent() {
+  const region = 'Server';
+  
+  return (
+    <Say>
+      Hello from the <strong>{region}</strong>
+    </Say>
+  );
+}
+```
+
+### unstable_createWithSay
+
+Create a higher-order component that automatically initializes the Say instance for server components:
+
+```tsx
+import 'server-only';
+import { unstable_createWithSay } from '@saykit/react/server';
+import { Say } from 'saykit';
+
+const say = new Say({
+  locales: ['en', 'fr'],
+  messages: {
+    en: await import('./locales/en/messages.json'),
+    fr: await import('./locales/fr/messages.json'),
+  },
+});
+
+export const withSay = unstable_createWithSay(say);
+```
+
+Then use it to wrap your server components:
+
+```tsx
+import { withSay } from './i18n';
+import type { Say } from 'saykit';
+
+function RootLayout({
+  locale,
+  messages,
+  children,
+}: {
+  locale: string;
+  messages: Say.Messages;
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang={locale}>
+      <body>
+        <SayProvider locale={locale} messages={messages}>
+          {children}
+        </SayProvider>
+      </body>
+    </html>
+  );
+}
+
+export default withSay(
+  RootLayout, 
+  (props) => props.params.then(p => p.locale)
+);
+```
+
+## Say Component Features
+
+### Basic Usage
+
+The `Say` component is a macro that extracts messages at build time:
+
+```tsx
+import { Say } from '@saykit/react';
+
+<Say>
+  Welcome to our app!
+</Say>
+```
+
+### With Variables
+
+```tsx
+<Say>
+  Hello, <strong>{userName}</strong>!
+</Say>
+```
+
+### With React Components
+
+```tsx
+<Say>
+  Click <Link href="/about">here</Link> to learn more
+</Say>
+```
+
+### Pluralization
+
+```tsx
+<Say.Plural
+  _={itemCount}
+  _0="No items"
+  one="One item"
+  other="# items"
+/>
+```
+
+<Note>
+  Number props must be prefixed with `_` (e.g., `_0`, `_1`, `_2`) to avoid JSX parser issues.
+</Note>
+
+### Ordinals
+
+```tsx
+<Say.Ordinal
+  _={position}
+  _1="#st"
+  _2="#nd"
+  _3="#rd"
+  other="#th"
+/>
+```
+
+### Select (Gender/Category)
+
+```tsx
+<Say.Select
+  _={gender}
+  male="He is online"
+  female="She is online"
+  other="They are online"
+/>
+```
+
+## Complete Example (Next.js App Router)
+
+<Steps>
+  <Step title="Create i18n configuration">
+    Create `src/i18n.ts` for server-side Say setup:
+    
+    ```tsx src/i18n.ts
+    import 'server-only';
+    import { unstable_createWithSay } from '@saykit/react/server';
+    import { Say } from 'saykit';
+
+    const say = new Say({
+      locales: ['en', 'fr'],
+      messages: {
+        en: await import('./locales/en/messages.json').then(m => m.default),
+        fr: await import('./locales/fr/messages.json').then(m => m.default),
+      },
+    });
+
+    export const withSay = unstable_createWithSay(say);
+    export default say;
+    ```
+  </Step>
+
+  <Step title="Setup root layout">
+    Wrap your app with `SayProvider` in the layout:
+    
+    ```tsx src/app/[locale]/layout.tsx
+    import { SayProvider } from '@saykit/react/client';
+    import type { Say } from 'saykit';
+    import say, { withSay } from '../../i18n';
+
+    export function generateStaticParams() {
+      return say.map(([, locale]) => ({ locale }));
+    }
+
+    async function RootLayout({
+      locale,
+      messages,
+      children,
+    }: {
+      locale: string;
+      messages: Say.Messages;
+      children: React.ReactNode;
+    }) {
+      return (
+        <html lang={locale}>
+          <body>
+            <SayProvider locale={locale} messages={messages}>
+              {children}
+            </SayProvider>
+          </body>
+        </html>
+      );
+    }
+
+    export default withSay(RootLayout, (p) => p.params.then(p => p.locale));
+    ```
+  </Step>
+
+  <Step title="Use in server components">
+    ```tsx src/app/[locale]/server-component.tsx
+    import { Say } from '@saykit/react';
+
+    export default function ServerComponent() {
+      const region = 'Server';
+      
+      return (
+        <Say>
+          Hello from the <strong>{region}</strong>
+        </Say>
+      );
+    }
+    ```
+  </Step>
+
+  <Step title="Use in client components">
+    ```tsx src/app/[locale]/client-component.tsx
+    'use client';
+
+    import { Say } from '@saykit/react';
+
+    export default function ClientComponent() {
+      const region = 'Client';
+      
+      return (
+        <Say>
+          Hello from the <strong>{region}</strong>
+        </Say>
+      );
+    }
+    ```
+  </Step>
+</Steps>
+
+## Type Imports
+
+Import types for proper TypeScript support:
+
+```tsx
+import type { Say } from 'saykit';
+import type { ReadonlySay } from 'saykit';
+
+type Messages = Say.Messages;
+type MessageDescriptor = Say.MessageDescriptor;
+```
+
+## Notes
+
+<Warning>
+  The `Say` component is a **macro** and requires the Babel plugin or unplugin to transform at build time. See [Babel Plugin](/integrations/babel) or [Unplugin](/integrations/unplugin) for setup instructions.
+</Warning>
+
+<Note>
+  When using numeric props in JSX (like pluralization rules), prefix them with `_` to avoid JSX parsing issues. For example, use `_0` instead of `0`.
+</Note>

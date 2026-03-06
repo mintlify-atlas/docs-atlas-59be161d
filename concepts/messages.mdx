@@ -1,0 +1,373 @@
+---
+title: Messages
+description: Learn how to define translatable messages using Saykit's macro syntax
+---
+
+Saykit provides multiple ways to define messages using **macros** that are transformed at compile-time by the Babel plugin.
+
+## Basic Message Syntax
+
+### Tagged Template Literals
+
+The most common way to define messages:
+
+```typescript
+import say from './i18n';
+
+const greeting = say`Hello, world!`;
+const personalized = say`Hello, ${userName}!`;
+```
+
+At compile-time, this becomes:
+
+```typescript
+const greeting = say.call({ id: "a1b2c3" });
+const personalized = say.call({ id: "d4e5f6", 0: userName });
+```
+
+**How it works:**
+
+1. The Babel plugin detects the `say` tagged template
+2. Extracts the message content: `"Hello, {0}!"`
+3. Generates a stable hash ID based on the message
+4. Transforms the template into a `call()` method
+
+**Location:** `packages/plugin-babel/src/features/js/parser.ts:13-42`
+
+### With Placeholders
+
+Placeholders are automatically numbered:
+
+```typescript
+say`Your order of ${quantity} ${item} is ready!`
+```
+
+Extracted as:
+
+```
+Your order of {0} {1} is ready!
+```
+
+<Note>
+  Placeholders are numbered in the order they appear in the template string.
+</Note>
+
+## Message Descriptors
+
+Add custom IDs or context for disambiguation:
+
+### Custom ID
+
+Provide a stable, semantic ID instead of a generated hash:
+
+```typescript
+say({ id: 'greeting.hello' })`Hello!`
+say({ id: 'button.submit' })`Submit`
+```
+
+### Context Parameter
+
+Disambiguate identical strings with different meanings:
+
+```typescript
+// "Right" as in direction
+say({ context: 'direction' })`Right`
+
+// "Right" as in correctness
+say({ context: 'correctness' })`Right`
+```
+
+These generate different IDs and extract as separate messages:
+
+```po
+msgctxt "direction"
+msgid "Right"
+msgstr ""
+
+msgctxt "correctness"
+msgid "Right"
+msgstr ""
+```
+
+**Location:** `packages/integration/src/runtime.ts:43-56`
+
+### Combined
+
+You can use both `id` and `context`:
+
+```typescript
+say({ id: 'direction.right', context: 'navigation' })`Right`
+```
+
+## Pluralization
+
+Handle plural forms using CLDR rules:
+
+```typescript
+say.plural(itemCount, {
+  one: 'You have 1 item',
+  other: 'You have # items',
+})
+```
+
+The `#` symbol is replaced with the numeric value in the message.
+
+**Extracted as:**
+
+```
+{0, plural,
+  one {You have 1 item}
+  other {You have # items}
+}
+```
+
+### CLDR Plural Categories
+
+Support all CLDR categories:
+
+```typescript
+say.plural(count, {
+  zero: 'No items',
+  one: '1 item',
+  two: '2 items',
+  few: 'A few items',
+  many: 'Many items',
+  other: '# items',
+})
+```
+
+<Tip>
+  Different locales use different plural rules. For example, English only uses `one` and `other`, but Arabic uses all six categories.
+</Tip>
+
+### Exact Numbers
+
+Match exact numbers explicitly:
+
+```typescript
+say.plural(count, {
+  0: 'No items',
+  1: 'One item',
+  other: '# items',
+})
+```
+
+**Location:** `packages/integration/src/runtime.ts:320-329`
+
+## Ordinals
+
+Format ordinal numbers (1st, 2nd, 3rd):
+
+```typescript
+say.ordinal(position, {
+  1: '#st',
+  2: '#nd',
+  3: '#rd',
+  other: '#th',
+})
+```
+
+Or with CLDR categories:
+
+```typescript
+say.ordinal(position, {
+  one: '#st',
+  two: '#nd',
+  few: '#rd',
+  other: '#th',
+})
+```
+
+**Location:** `packages/integration/src/runtime.ts:350-359`
+
+## Select
+
+Branch based on a string value:
+
+```typescript
+say.select(gender, {
+  male: 'He is online',
+  female: 'She is online',
+  other: 'They are online',
+})
+```
+
+**Extracted as:**
+
+```
+{0, select,
+  male {He is online}
+  female {She is online}
+  other {They are online}
+}
+```
+
+Useful for:
+- Gender selection
+- Status messages
+- Role-based text
+- Any categorical branching
+
+**Location:** `packages/integration/src/runtime.ts:378-387`
+
+## JSX Syntax (React)
+
+For React applications, use the `<Say>` component:
+
+```tsx
+import { Say } from '@saykit/react';
+
+<Say>Welcome to our app!</Say>
+
+<Say>
+  Hello, <strong>{userName}</strong>!
+</Say>
+```
+
+Extracted as:
+
+```
+Welcome to our app!
+
+Hello, <0>{userName}</0>!
+```
+
+JSX elements are numbered like placeholders.
+
+**Location:** `packages/plugin-babel/src/features/jsx/parser.ts`
+
+## Translator Comments
+
+Add context for translators using special comments:
+
+```typescript
+// translators: This appears on the login button
+say`Sign in`
+
+// translators: Username field label in the registration form
+say`Username`
+```
+
+Comments starting with `translators:` are extracted to the message file:
+
+```po
+# This appears on the login button
+msgid "Sign in"
+msgstr ""
+
+# Username field label in the registration form
+msgid "Username"
+msgstr ""
+```
+
+**Location:** `packages/plugin-babel/src/features/js/parser.ts:214-221`
+
+## Extraction Output
+
+When you run `saykit extract`, messages are written to files in the format specified by your formatter (default: PO).
+
+### PO File Format
+
+Default extraction format:
+
+```po
+msgid ""
+msgstr ""
+"POT-Creation-Date: 2025-12-29 11:02+1300\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: en\n"
+"X-Generator: saykit\n"
+
+#: src/commands/about.ts:16
+msgid "about"
+msgstr "about"
+
+#: src/commands/about.ts:40
+msgid "Your name is {name}!"
+msgstr "Your name is {name}!"
+
+#: src/commands/ping.ts:19
+msgid "Pong! Latency is {latency}ms."
+msgstr "Pong! Latency is {latency}ms."
+```
+
+**Key elements:**
+- `#:` - Source file references
+- `msgid` - The source message
+- `msgstr` - The translation (empty for source locale)
+
+**Example:** `examples/carbon-tsdown/src/locales/en/messages.po`
+
+### Compiled JSON Format
+
+After running `saykit compile`, messages are converted to JSON for runtime:
+
+```json
+{
+  "a1b2c3d4": "Hello, {0}!",
+  "e5f6g7h8": "Your name is {name}!",
+  "i9j0k1l2": "Pong! Latency is {latency}ms."
+}
+```
+
+This format is optimized for fast runtime lookups.
+
+## Message ID Generation
+
+Message IDs are generated using a stable hash algorithm:
+
+```typescript
+function generateHash(message: string, context?: string): string {
+  // Generates a stable hash like "a1b2c3d4e5f6g7h8"
+}
+```
+
+**Properties:**
+- Deterministic: Same message always generates the same ID
+- Context-aware: Context parameter affects the hash
+- Collision-resistant: Different messages produce different IDs
+
+**Location:** `packages/plugin-babel/src/core/messages/hash.ts`
+
+<Note>
+  Custom IDs (via `say({ id: '...' })`) bypass hash generation and use your provided ID directly.
+</Note>
+
+## Best Practices
+
+<Card title="Use Semantic IDs for Important Messages" icon="hashtag">
+  For navigation, branding, or critical UI elements, use custom IDs:
+  
+  ```typescript
+  say({ id: 'nav.home' })`Home`
+  say({ id: 'brand.tagline' })`Your trusted partner`
+  ```
+</Card>
+
+<Card title="Add Context for Ambiguous Strings" icon="message-question">
+  When the same word has different meanings:
+  
+  ```typescript
+  say({ context: 'noun' })`Post`
+  say({ context: 'verb' })`Post`
+  ```
+</Card>
+
+<Card title="Use Translator Comments" icon="comment">
+  Help translators understand context:
+  
+  ```typescript
+  // translators: Button text - keep it short (max 20 chars)
+  say`Continue`
+  ```
+</Card>
+
+<Card title="Prefer Template Literals Over Concatenation" icon="link">
+  ❌ Don't: `say\`Hello\` + \`, \` + say\`${name}\``
+  
+  ✅ Do: `say\`Hello, ${name}\``
+</Card>
+
+<Warning>
+  Macros must be used with the Babel plugin configured. They will throw runtime errors if the plugin is not active.
+</Warning>

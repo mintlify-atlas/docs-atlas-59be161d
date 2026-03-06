@@ -1,0 +1,575 @@
+---
+title: Say Class
+description: The core runtime class for managing locales and translations
+---
+
+The `Say` class is the central runtime component of Saykit. It manages locales, message catalogs, and provides methods for loading, activating, and accessing translations.
+
+## Constructor
+
+Creates a new `Say` instance with the specified configuration.
+
+```typescript
+class Say<
+  Locale extends string = string,
+  Loader extends Say.Loader<Locale> | undefined = Say.Loader<Locale> | undefined
+>
+
+constructor(options: Say.Options<Locale, Loader>)
+```
+
+<ParamField path="options" type="Say.Options<Locale, Loader>" required>
+  Configuration options for the Say instance
+  
+  <Expandable title="properties">
+    <ParamField path="locales" type="Locale[]" required>
+      Array of supported locale codes
+    </ParamField>
+    
+    <ParamField path="messages" type="Record<Locale, Say.Messages> | Partial<Record<Locale, Say.Messages>>">
+      Pre-loaded messages mapped by locale. Either provide all messages upfront or use with a loader for dynamic loading.
+    </ParamField>
+    
+    <ParamField path="loader" type="Say.Loader<Locale>">
+      Function that loads messages for a given locale. Required if messages are not fully provided upfront.
+      
+      ```typescript
+      type Loader<Locale extends string> = (
+        locale: Locale
+      ) => Messages | Promise<Messages>
+      ```
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Example
+
+```typescript
+import { Say } from 'saykit';
+
+const say = new Say({
+  locales: ['en', 'es', 'fr'],
+  messages: {
+    en: { greeting: 'Hello, {name}!' },
+    es: { greeting: '¡Hola, {name}!' },
+  },
+  loader: async (locale) => {
+    const messages = await import(`./locales/${locale}.json`);
+    return messages.default;
+  },
+});
+```
+
+## Properties
+
+### locale
+
+The currently active locale.
+
+```typescript
+get locale(): Locale
+```
+
+<ResponseField name="locale" type="Locale">
+  The active locale code
+</ResponseField>
+
+<Warning>
+  Throws an error if no locale is currently active. Call `activate()` first.
+</Warning>
+
+### messages
+
+All available messages for the currently active locale.
+
+```typescript
+get messages(): Say.Messages
+```
+
+<ResponseField name="messages" type="Say.Messages">
+  A record mapping message IDs to their translated strings
+  
+  ```typescript
+  type Messages = { [key: string]: string }
+  ```
+</ResponseField>
+
+<Warning>
+  Throws an error if:
+  - No locale is currently active
+  - No messages are loaded for the active locale
+</Warning>
+
+## Methods
+
+### load()
+
+Loads messages for the specified locales using the configured loader.
+
+```typescript
+load(...locales: Locale[]): this | Promise<this>
+```
+
+<ParamField path="locales" type="Locale[]">
+  Locales to load messages for. If omitted, loads all available locales.
+</ParamField>
+
+<ResponseField name="return" type="this | Promise<this>">
+  Returns the Say instance (or a Promise resolving to it if the loader is async)
+</ResponseField>
+
+<Note>
+  If the loader returns a Promise, this method will also return a Promise. Otherwise, it returns synchronously.
+</Note>
+
+#### Example
+
+```typescript
+// Load specific locales
+await say.load('en', 'es');
+
+// Load all configured locales
+await say.load();
+```
+
+### activate()
+
+Sets the active locale for translations.
+
+```typescript
+activate(locale: Locale): this
+```
+
+<ParamField path="locale" type="Locale" required>
+  The locale to activate
+</ParamField>
+
+<ResponseField name="return" type="this">
+  The Say instance (for chaining)
+</ResponseField>
+
+<Warning>
+  Throws an error if:
+  - The instance is frozen
+  - No messages are loaded for the specified locale
+</Warning>
+
+#### Example
+
+```typescript
+say.activate('en');
+console.log(say.locale); // 'en'
+```
+
+### assign()
+
+Manually assigns messages to one or more locales.
+
+```typescript
+// Assign messages to a single locale
+assign(locale: Locale, messages: Say.Messages): this
+
+// Bulk assign messages to multiple locales
+assign(messages: Partial<Record<Locale, Say.Messages>>): this
+```
+
+<ParamField path="locale" type="Locale">
+  The locale to assign messages to (single locale variant)
+</ParamField>
+
+<ParamField path="messages" type="Say.Messages | Partial<Record<Locale, Say.Messages>>" required>
+  Messages to assign. Either a single messages object or a record mapping locales to messages.
+</ParamField>
+
+<ResponseField name="return" type="this">
+  The Say instance (for chaining)
+</ResponseField>
+
+<Warning>
+  Throws an error if the instance is frozen
+</Warning>
+
+#### Examples
+
+```typescript
+// Assign to a single locale
+say.assign('en', {
+  greeting: 'Hello, {name}!',
+  farewell: 'Goodbye!',
+});
+
+// Bulk assign to multiple locales
+say.assign({
+  en: { greeting: 'Hello!' },
+  es: { greeting: '¡Hola!' },
+  fr: { greeting: 'Bonjour!' },
+});
+```
+
+### clone()
+
+Creates a deep copy of the Say instance with the same configuration and messages.
+
+```typescript
+clone(): this
+```
+
+<ResponseField name="return" type="this">
+  A new Say instance with the same locales, messages, and loader
+</ResponseField>
+
+#### Example
+
+```typescript
+const original = new Say({ locales: ['en'], messages: { en: { hi: 'Hello' } } });
+const copy = original.clone();
+
+copy.activate('en');
+console.log(copy.call({ id: 'hi' })); // 'Hello'
+```
+
+### freeze()
+
+Freeze the Say instance, preventing further modifications.
+
+```typescript
+freeze(): ReadonlySay<Locale, Loader>
+```
+
+<ResponseField name="return" type="ReadonlySay<Locale, Loader>">
+  A readonly version of the Say instance that cannot be modified
+</ResponseField>
+
+<Info>
+  The returned instance has `activate()`, `load()`, and `assign()` methods removed from its type signature.
+</Info>
+
+#### Example
+
+```typescript
+const say = new Say({ /* ... */ });
+const frozen = say.freeze();
+
+// These will throw errors:
+// frozen.activate('en');
+// frozen.assign('en', { ... });
+```
+
+### map()
+
+Maps over all locales, calling a callback with a cloned Say instance for each locale.
+
+```typescript
+map<T>(
+  callbackfn: (
+    value: [this, Locale],
+    index: number,
+    array: [this, Locale][]
+  ) => T
+): T[]
+```
+
+<ParamField path="callbackfn" type="function" required>
+  Function to execute for each locale. Receives:
+  - `value`: A tuple of `[Say instance, locale]`
+  - `index`: The current index
+  - `array`: The full array of tuples
+</ParamField>
+
+<ResponseField name="return" type="T[]">
+  Array of results from the callback function
+</ResponseField>
+
+#### Example
+
+```typescript
+const greetings = say.map(([instance, locale]) => {
+  return instance.call({ id: 'greeting', name: 'World' });
+});
+
+console.log(greetings);
+// ['Hello, World!', '¡Hola, World!', 'Bonjour, World!']
+```
+
+### reduce()
+
+Reduces all locales to a single value by calling a callback for each locale.
+
+```typescript
+reduce<T>(
+  callbackfn: (
+    previousValue: T,
+    currentValue: [this, Locale],
+    currentIndex: number,
+    array: [this, Locale][]
+  ) => T,
+  initialValue: T
+): T
+```
+
+<ParamField path="callbackfn" type="function" required>
+  Function to execute for each locale. Receives:
+  - `previousValue`: The accumulated value
+  - `currentValue`: A tuple of `[Say instance, locale]`
+  - `currentIndex`: The current index
+  - `array`: The full array of tuples
+</ParamField>
+
+<ParamField path="initialValue" type="T" required>
+  Initial value for the accumulator
+</ParamField>
+
+<ResponseField name="return" type="T">
+  The final accumulated value
+</ResponseField>
+
+#### Example
+
+```typescript
+const allMessages = say.reduce((acc, [instance, locale]) => {
+  acc[locale] = instance.messages;
+  return acc;
+}, {} as Record<string, Say.Messages>);
+```
+
+### match()
+
+Finds the best matching locale from a list of preferences.
+
+```typescript
+match(guesses: string[]): Locale
+```
+
+<ParamField path="guesses" type="string[]" required>
+  Array of locale codes in order of preference (e.g., from `Accept-Language` header)
+</ParamField>
+
+<ResponseField name="return" type="Locale">
+  The best matching locale, or the first configured locale if no match is found
+</ResponseField>
+
+<Info>
+  The matching algorithm:
+  1. First tries exact matches
+  2. Then tries language prefix matches (e.g., `en` matches `en-US`)
+  3. Falls back to the first configured locale
+</Info>
+
+#### Example
+
+```typescript
+const say = new Say({ locales: ['en-US', 'es-ES', 'fr-FR'], /* ... */ });
+
+const locale = say.match(['es-MX', 'es', 'en']);
+console.log(locale); // 'es-ES' (prefix match)
+
+const defaultLocale = say.match(['de', 'it']);
+console.log(defaultLocale); // 'en-US' (fallback)
+```
+
+### call()
+
+Retrieves and formats a translation by its message ID.
+
+```typescript
+call(descriptor: { id: string; [match: string | number]: unknown }): string
+```
+
+<ParamField path="descriptor" type="object" required>
+  Object containing the message ID and any interpolation values
+  
+  <Expandable title="properties">
+    <ParamField path="id" type="string" required>
+      The message identifier
+    </ParamField>
+    
+    <ParamField path="[key]" type="unknown">
+      Additional properties for interpolation (variable names and their values)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ResponseField name="return" type="string">
+  The formatted translation string
+</ResponseField>
+
+<Warning>
+  Throws an error if:
+  - No locale is active
+  - No messages are loaded for the active locale
+  - The message ID is not found
+  - The message is not a string
+</Warning>
+
+#### Example
+
+```typescript
+say.activate('en');
+say.assign('en', {
+  greeting: 'Hello, {name}!',
+  items: 'You have {count} {count, plural, one {item} other {items}}',
+});
+
+console.log(say.call({ id: 'greeting', name: 'Alice' }));
+// 'Hello, Alice!'
+
+console.log(say.call({ id: 'items', count: 5 }));
+// 'You have 5 items'
+```
+
+## Macro Methods
+
+<Warning>
+  These methods are compile-time macros and require the Saykit Babel plugin. They will throw runtime errors if called directly without transformation.
+</Warning>
+
+### plural()
+
+Defines a pluralized message based on CLDR plural categories.
+
+```typescript
+plural(
+  value: number,
+  options: NumeralOptions
+): string
+```
+
+<ParamField path="value" type="number" required>
+  The numeric value to determine the plural form
+</ParamField>
+
+<ParamField path="options" type="NumeralOptions" required>
+  Plural rules keyed by CLDR categories (`zero`, `one`, `two`, `few`, `many`, `other`) or specific numbers
+  
+  ```typescript
+  interface NumeralOptions {
+    other: string; // Required fallback
+    zero?: string;
+    one?: string;
+    two?: string;
+    few?: string;
+    many?: string;
+    [digit: number]: string; // Exact number matches
+  }
+  ```
+  
+  Use `#` in option strings to represent the numeric value.
+</ParamField>
+
+<ResponseField name="return" type="string">
+  The selected plural form
+</ResponseField>
+
+#### Example
+
+```typescript
+say.plural(count, {
+  0: 'No items',
+  one: 'One item',
+  other: '# items',
+})
+// Transforms to: say.call({ id: '...', count })
+```
+
+### ordinal()
+
+Defines an ordinal message (e.g., "1st", "2nd", "3rd").
+
+```typescript
+ordinal(
+  value: number,
+  options: NumeralOptions
+): string
+```
+
+<ParamField path="value" type="number" required>
+  The numeric value to determine the ordinal form
+</ParamField>
+
+<ParamField path="options" type="NumeralOptions" required>
+  Ordinal rules keyed by CLDR categories or specific numbers. Use `#` to represent the numeric value.
+</ParamField>
+
+<ResponseField name="return" type="string">
+  The selected ordinal form
+</ResponseField>
+
+#### Example
+
+```typescript
+say.ordinal(position, {
+  1: '#st',
+  2: '#nd',
+  3: '#rd',
+  other: '#th',
+})
+// 1 → '1st', 2 → '2nd', 3 → '3rd', 4 → '4th'
+```
+
+### select()
+
+Defines a selection message based on a string value.
+
+```typescript
+select(
+  value: string,
+  options: SelectOptions
+): string
+```
+
+<ParamField path="value" type="string" required>
+  The selector value
+</ParamField>
+
+<ParamField path="options" type="SelectOptions" required>
+  A mapping of possible selector values to message strings
+  
+  ```typescript
+  interface SelectOptions {
+    other: string; // Required fallback
+    [match: string | number]: string;
+  }
+  ```
+</ParamField>
+
+<ResponseField name="return" type="string">
+  The selected message
+</ResponseField>
+
+#### Example
+
+```typescript
+say.select(gender, {
+  male: 'He',
+  female: 'She',
+  other: 'They',
+})
+// Useful for gender, status, or any categorical selection
+```
+
+## Type Definitions
+
+```typescript
+namespace Say {
+  type Messages = { [key: string]: string };
+  
+  type Loader<Locale extends string> = (
+    locale: Locale
+  ) => Messages | Promise<Messages>;
+  
+  type Options<
+    Locale extends string,
+    Loader extends Say.Loader<Locale> | undefined
+  > = {
+    locales: Locale[];
+  } & (
+    | { messages: Record<Locale, Messages>; loader?: Loader }
+    | { messages?: Partial<Record<Locale, Messages>>; loader: Loader }
+  );
+}
+
+type ReadonlySay<
+  Locale extends string = string,
+  Loader extends Say.Loader<Locale> | undefined = Say.Loader<Locale> | undefined
+> = Omit<Say<Locale, Loader>, 'activate' | 'load' | 'assign'>;
+```

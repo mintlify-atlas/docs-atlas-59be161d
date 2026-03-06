@@ -1,0 +1,109 @@
+---
+title: defineConfig
+description: Type-safe configuration helper for Saykit projects
+---
+
+The `defineConfig` function is a type inference helper that provides TypeScript intellisense and validation for your Saykit configuration file.
+
+## Signature
+
+```typescript
+function defineConfig<C extends input<typeof Configuration>>(
+  config: C
+): C
+```
+
+<ParamField path="config" type="Configuration" required>
+  Your Saykit configuration object
+</ParamField>
+
+<ResponseField name="return" type="C">
+  The same configuration object, with full type inference
+</ResponseField>
+
+## Purpose
+
+This function is a **pass-through identity function** that exists solely to provide TypeScript type inference. It:
+
+- Returns the exact same object you pass in
+- Provides autocomplete for configuration options
+- Validates your configuration against the Saykit schema
+- Helps catch configuration errors at development time
+
+<Info>
+  `defineConfig` uses Zod's `input` type to validate the configuration schema. This ensures your config matches the expected structure.
+</Info>
+
+## Usage
+
+Use `defineConfig` in your `saykit.config.ts` file to get full TypeScript support:
+
+```typescript saykit.config.ts
+import { defineConfig } from 'saykit/config';
+
+export default defineConfig({
+  include: ['src/**/*.{ts,tsx}'],
+  exclude: ['**/*.test.ts', '**/*.spec.ts'],
+  output: {
+    path: './locales',
+    format: 'json',
+  },
+  locales: ['en', 'es', 'fr'],
+  sourceLocale: 'en',
+});
+```
+
+## Benefits
+
+### 1. Autocomplete
+
+Your editor will suggest valid configuration options as you type:
+
+```typescript
+export default defineConfig({
+  // Type "out" and see suggestions: output, ...
+  output: {
+    // Type "f" and see suggestions: format, ...
+  },
+});
+```
+
+### 2. Type Safety
+
+Invalid configurations are caught immediately:
+
+```typescript
+export default defineConfig({
+  output: {
+    format: 'xml', // ❌ Error: 'xml' is not a valid format
+  },
+});
+```
+
+### 3. Documentation
+
+Hover over any property to see inline documentation:
+
+```typescript
+export default defineConfig({
+  sourceLocale: 'en', // 👆 Hover to see: "The source locale for your project"
+});
+```
+
+## Without defineConfig
+
+You can still export a plain object, but you'll lose type checking and autocomplete:
+
+```typescript
+// This works, but no type safety
+export default {
+  include: ['src/**/*.ts'],
+  output: { path: './locales' },
+};
+```
+
+## Related
+
+- [Configuration Guide](/concepts/configuration) - Complete configuration reference
+- [Project Setup](/installation) - Initial project configuration
+- [Say Class](/api/say-class) - Runtime API for translations

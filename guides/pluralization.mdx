@@ -1,0 +1,332 @@
+---
+title: Pluralization
+description: Handle plurals, ordinals, and select expressions with locale-aware rules
+---
+
+Saykit provides powerful pluralization features that automatically adapt to language-specific plural rules using CLDR (Unicode Common Locale Data Repository) standards.
+
+## Plural Categories
+
+Different languages have different plural rules. Saykit supports all six CLDR plural categories:
+
+- **zero**: Used in some languages for zero items (Arabic, Latvian)
+- **one**: Singular form (most languages)
+- **two**: Dual form (Arabic, Hebrew)
+- **few**: Small quantities (Polish, Russian, Czech)
+- **many**: Large quantities (Polish, Russian)
+- **other**: Default/fallback (always required)
+
+<Note>
+  English only uses `one` and `other`, but languages like Arabic use all six categories. Saykit automatically selects the correct form based on the active locale.
+</Note>
+
+## Plural Messages
+
+Use `say.plural()` to create messages that adapt to quantity:
+
+```typescript
+import { say } from './i18n';
+
+function CartSummary({ count }: { count: number }) {
+  return (
+    <div>
+      {say.plural(count, {
+        one: 'You have 1 item in your cart',
+        other: 'You have # items in your cart',
+      })}
+    </div>
+  );
+}
+```
+
+### The # Placeholder
+
+The `#` symbol is automatically replaced with the numeric value:
+
+```typescript
+say.plural(5, {
+  one: '# item',
+  other: '# items',
+});
+// Result: "5 items"
+
+say.plural(1, {
+  one: '# item',
+  other: '# items',
+});
+// Result: "1 item"
+```
+
+## Language-Specific Examples
+
+### English (one, other)
+
+```typescript
+say.plural(count, {
+  one: '1 notification',
+  other: '# notifications',
+});
+```
+
+| Count | Output |
+|-------|--------|
+| 0 | "0 notifications" |
+| 1 | "1 notification" |
+| 2 | "2 notifications" |
+| 100 | "100 notifications" |
+
+### Polish (one, few, many, other)
+
+Polish has complex plural rules:
+
+```typescript
+say.plural(count, {
+  one: '# plik',      // 1 file
+  few: '# pliki',     // 2-4 files
+  many: '# plików',   // 5+ files
+  other: '# pliku',   // fractional
+});
+```
+
+| Count | Category | Output |
+|-------|----------|--------|
+| 1 | one | "1 plik" |
+| 2 | few | "2 pliki" |
+| 5 | many | "5 plików" |
+| 1.5 | other | "1.5 pliku" |
+
+### Arabic (zero, one, two, few, many, other)
+
+Arabic uses all six categories:
+
+```typescript
+say.plural(count, {
+  zero: 'لا توجد كتب',      // no books
+  one: 'كتاب واحد',         // 1 book
+  two: 'كتابان',           // 2 books
+  few: '# كتب',            // 3-10 books
+  many: '# كتاباً',        // 11-99 books
+  other: '# كتاب',         // 100+ books
+});
+```
+
+<Warning>
+  Always include the `other` category as a fallback. It's required by the CLDR specification and ensures your messages work across all locales.
+</Warning>
+
+## Exact Matches
+
+Override specific numbers with exact match rules:
+
+```typescript
+say.plural(count, {
+  0: 'No items',
+  1: 'One item',
+  other: '# items',
+});
+```
+
+| Count | Output |
+|-------|--------|
+| 0 | "No items" |
+| 1 | "One item" |
+| 2 | "2 items" |
+
+Exact matches take precedence over category rules:
+
+```typescript
+say.plural(count, {
+  0: 'Your cart is empty',
+  one: '# item in cart',
+  other: '# items in cart',
+});
+// count=0: "Your cart is empty" (exact match)
+// count=1: "1 item in cart" (category match)
+// count=5: "5 items in cart" (category match)
+```
+
+## Ordinal Numbers
+
+Use `say.ordinal()` for ranking and positioning (1st, 2nd, 3rd, etc.):
+
+```typescript
+function RacePosition({ position }: { position: number }) {
+  return (
+    <span>
+      {say.ordinal(position, {
+        one: '#st',
+        two: '#nd',
+        few: '#rd',
+        other: '#th',
+      })}
+    </span>
+  );
+}
+```
+
+### English Ordinals
+
+```typescript
+say.ordinal(position, {
+  1: '1st place',
+  2: '2nd place',
+  3: '3rd place',
+  other: '#th place',
+});
+```
+
+| Position | Output |
+|----------|--------|
+| 1 | "1st place" |
+| 2 | "2nd place" |
+| 3 | "3rd place" |
+| 4 | "4th place" |
+| 21 | "21st place" |
+
+<Accordion title="Ordinal Rules by Language">
+  Different languages have different ordinal patterns:
+  
+  **English**: Uses `one` (1st, 21st), `two` (2nd, 22nd), `few` (3rd, 23rd), `other` (4th-20th)
+  
+  **French**: All ordinals use `one` for 1 (1er) and `other` for everything else (2e, 3e, 4e)
+  
+  **Spanish**: Similar to French, but uses different suffixes (1.º, 2.º, 3.º)
+</Accordion>
+
+## Select Expressions
+
+Use `say.select()` for categorical values like gender, status, or roles:
+
+```typescript
+function UserGreeting({ gender, name }: { gender: string; name: string }) {
+  const pronoun = say.select(gender, {
+    male: 'He',
+    female: 'She',
+    other: 'They',
+  });
+  
+  return <p>{pronoun} is named {name}</p>;
+}
+```
+
+### Status Messages
+
+```typescript
+function OrderStatus({ status }: { status: string }) {
+  return (
+    <div>
+      {say.select(status, {
+        pending: 'Your order is being processed',
+        shipped: 'Your order is on its way',
+        delivered: 'Your order has been delivered',
+        cancelled: 'Your order was cancelled',
+        other: 'Unknown order status',
+      })}
+    </div>
+  );
+}
+```
+
+<Note>
+  Unlike `plural()` and `ordinal()`, the selector in `say.select()` is a string, not a number. The `#` placeholder is not available in select expressions.
+</Note>
+
+## Nested Expressions
+
+Combine plurals, ordinals, and selects for complex messages:
+
+```typescript
+function Achievement({ rank, points, gender }: Props) {
+  return (
+    <div>
+      {say.select(gender, {
+        male: say.plural(points, {
+          one: `He earned # point and ranked ${say.ordinal(rank, { one: '#st', two: '#nd', few: '#rd', other: '#th' })}`,
+          other: `He earned # points and ranked ${say.ordinal(rank, { one: '#st', two: '#nd', few: '#rd', other: '#th' })}`,
+        }),
+        female: say.plural(points, {
+          one: `She earned # point and ranked ${say.ordinal(rank, { one: '#st', two: '#nd', few: '#rd', other: '#th' })}`,
+          other: `She earned # points and ranked ${say.ordinal(rank, { one: '#st', two: '#nd', few: '#rd', other: '#th' })}`,
+        }),
+        other: say.plural(points, {
+          one: `They earned # point and ranked ${say.ordinal(rank, { one: '#st', two: '#nd', few: '#rd', other: '#th' })}`,
+          other: `They earned # points and ranked ${say.ordinal(rank, { one: '#st', two: '#nd', few: '#rd', other: '#th' })}`,
+        }),
+      })}
+    </div>
+  );
+}
+```
+
+## Type Safety
+
+All pluralization methods are type-checked:
+
+```typescript
+// ✅ Valid: includes required 'other' category
+say.plural(count, {
+  one: '# item',
+  other: '# items',
+});
+
+// ❌ Error: missing required 'other' category
+say.plural(count, {
+  one: '# item',
+});
+
+// ✅ Valid: includes optional categories
+say.plural(count, {
+  zero: 'No items',
+  one: '# item',
+  few: '# items',
+  other: '# items',
+});
+```
+
+<Accordion title="TypeScript Definition">
+  The pluralization methods use TypeScript to enforce CLDR compliance:
+  
+  ```typescript
+  interface NumeralOptions {
+    zero?: string;
+    one?: string;
+    two?: string;
+    few?: string;
+    many?: string;
+    other: string; // Required
+    [digit: number]: string; // Exact matches
+  }
+  
+  class Say {
+    plural(value: number, options: NumeralOptions): string;
+    ordinal(value: number, options: NumeralOptions): string;
+    select(value: string, options: SelectOptions): string;
+  }
+  ```
+</Accordion>
+
+## Extraction
+
+Plural, ordinal, and select expressions are automatically extracted:
+
+```typescript
+say.plural(count, {
+  one: 'You have # message',
+  other: 'You have # messages',
+});
+```
+
+Generates in PO format:
+
+```po
+msgid "{count, plural, one {You have # message} other {You have # messages}}"
+msgstr "{count, plural, one {You have # message} other {You have # messages}}"
+```
+
+Translators can then adapt the plural rules for their language while keeping the same code structure.
+
+## Next Steps
+
+- Learn about [Message Extraction](/guides/message-extraction) to generate translation files
+- Explore [TypeScript](/guides/typescript) for type-safe pluralization
+- See [Custom Formatters](/guides/custom-formatters) for alternative storage formats

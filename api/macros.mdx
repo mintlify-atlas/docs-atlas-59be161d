@@ -1,0 +1,465 @@
+---
+title: Macros
+description: Compile-time translation macros for extracting and transforming messages
+---
+
+Saykit provides compile-time macros that automatically extract translatable strings from your code and transform them into runtime translation calls. These macros require the **Saykit Babel plugin** to function.
+
+<Warning>
+  Macros are not regular functions. They are transformed at compile-time by the Babel plugin and will throw runtime errors if called directly without transformation.
+</Warning>
+
+## Template Literal Macro
+
+### say\`message\`
+
+Define a translatable message using a tagged template literal.
+
+```typescript
+say`message`
+```
+
+<ParamField path="message" type="string" required>
+  The message string, which can include interpolated expressions
+</ParamField>
+
+<ResponseField name="return" type="string">
+  The translated message at runtime
+</ResponseField>
+
+#### Example
+
+```typescript
+const greeting = say`Hello, ${name}!`;
+```
+
+**Compile-time transformation:**
+
+```typescript
+// Before transformation
+const greeting = say`Hello, ${name}!`;
+
+// After transformation
+const greeting = say.call({
+  id: 'abc123', // Auto-generated hash ID
+  name: name,
+});
+```
+
+**Extracted message:**
+
+```json
+{
+  "abc123": "Hello, {name}!"
+}
+```
+
+### Interpolation
+
+You can interpolate any JavaScript expression:
+
+```typescript
+say`Welcome, ${user.name}!`
+say`You have ${count} ${count === 1 ? 'item' : 'items'}`
+say`Total: ${price * quantity}`
+```
+
+The Babel plugin automatically extracts variable names and passes them to the `call()` method.
+
+## Descriptor Macro
+
+### say({ id, context })
+
+Provide a custom ID or context to disambiguate messages.
+
+```typescript
+say(descriptor: { id?: string; context?: string })
+```
+
+<ParamField path="descriptor" type="object" required>
+  <Expandable title="properties">
+    <ParamField path="id" type="string">
+      Custom identifier for the message. If omitted, a hash is generated.
+    </ParamField>
+    
+    <ParamField path="context" type="string">
+      Additional context to disambiguate identical strings with different meanings
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ResponseField name="return" type="Say">
+  Returns the `say` function to be called as a tagged template
+</ResponseField>
+
+#### Example: Custom ID
+
+```typescript
+say({ id: 'greeting.welcome' })`Welcome back!`;
+```
+
+**Extracted message:**
+
+```json
+{
+  "greeting.welcome": "Welcome back!"
+}
+```
+
+#### Example: Context
+
+Use context to distinguish identical strings with different meanings:
+
+```typescript
+// The word "Right" in navigation
+say({ context: 'direction' })`Right`;
+
+// The word "Right" meaning correct
+say({ context: 'correctness' })`Right`;
+```
+
+**Extracted messages:**
+
+```json
+{
+  "abc123|direction": "Right",
+  "def456|correctness": "Right"
+}
+```
+
+Translators can now provide different translations based on context.
+
+## Plural Macro
+
+### say.plural()
+
+Define pluralized messages based on CLDR plural categories.
+
+```typescript
+say.plural(
+  value: number,
+  options: {
+    zero?: string;
+    one?: string;
+    two?: string;
+    few?: string;
+    many?: string;
+    other: string; // Required
+    [digit: number]: string; // Exact matches
+  }
+): string
+```
+
+<ParamField path="value" type="number" required>
+  The numeric value that determines which plural form to use
+</ParamField>
+
+<ParamField path="options" type="object" required>
+  Plural forms keyed by CLDR categories or exact numbers. Use `#` to represent the numeric value in strings.
+</ParamField>
+
+<ResponseField name="return" type="string">
+  The appropriate plural form for the given value
+</ResponseField>
+
+#### Example
+
+```typescript
+say.plural(itemCount, {
+  0: 'No items',
+  one: 'One item',
+  other: '# items',
+});
+```
+
+**Compile-time transformation:**
+
+```typescript
+// Before
+say.plural(itemCount, {
+  0: 'No items',
+  one: 'One item',
+  other: '# items',
+});
+
+// After
+say.call({
+  id: 'xyz789',
+  itemCount: itemCount,
+});
+```
+
+**Extracted message (ICU MessageFormat):**
+
+```json
+{
+  "xyz789": "{itemCount, plural, =0 {No items} one {One item} other {# items}}"
+}
+```
+
+#### CLDR Plural Categories
+
+The available categories depend on the language:
+
+- **`zero`**: Used in Arabic and some other languages
+- **`one`**: Singular form (1 item)
+- **`two`**: Dual form (used in Arabic, Hebrew, etc.)
+- **`few`**: Used in Slavic languages for numbers like 2-4
+- **`many`**: Used in Slavic and other languages
+- **`other`**: Default fallback (required)
+
+You can also use exact number matches:
+
+```typescript
+say.plural(count, {
+  0: 'Nothing',
+  1: 'Just one',
+  2: 'A couple',
+  other: 'Several (#)',
+});
+```
+
+## Ordinal Macro
+
+### say.ordinal()
+
+Define ordinal messages like "1st", "2nd", "3rd".
+
+```typescript
+say.ordinal(
+  value: number,
+  options: {
+    one?: string;
+    two?: string;
+    few?: string;
+    other: string; // Required
+    [digit: number]: string; // Exact matches
+  }
+): string
+```
+
+<ParamField path="value" type="number" required>
+  The numeric value to convert to ordinal form
+</ParamField>
+
+<ParamField path="options" type="object" required>
+  Ordinal forms keyed by CLDR categories or exact numbers. Use `#` to represent the numeric value.
+</ParamField>
+
+<ResponseField name="return" type="string">
+  The appropriate ordinal form
+</ResponseField>
+
+#### Example
+
+```typescript
+say.ordinal(position, {
+  1: '#st',
+  2: '#nd',
+  3: '#rd',
+  other: '#th',
+});
+```
+
+**Compile-time transformation:**
+
+```typescript
+// Before
+say.ordinal(position, { 1: '#st', 2: '#nd', 3: '#rd', other: '#th' });
+
+// After
+say.call({ id: 'ord123', position: position });
+```
+
+**Extracted message:**
+
+```json
+{
+  "ord123": "{position, selectordinal, =1 {#st} =2 {#nd} =3 {#rd} other {#th}}"
+}
+```
+
+#### Result
+
+```typescript
+say.ordinal(1, { ... }) // '1st'
+say.ordinal(2, { ... }) // '2nd'
+say.ordinal(3, { ... }) // '3rd'
+say.ordinal(4, { ... }) // '4th'
+```
+
+## Select Macro
+
+### say.select()
+
+Define selection-based messages for handling categories like gender or status.
+
+```typescript
+say.select(
+  value: string,
+  options: {
+    [match: string | number]: string;
+    other: string; // Required
+  }
+): string
+```
+
+<ParamField path="value" type="string" required>
+  The selector value that determines which option to use
+</ParamField>
+
+<ParamField path="options" type="object" required>
+  A mapping of possible selector values to message strings. Must include `other` as a fallback.
+</ParamField>
+
+<ResponseField name="return" type="string">
+  The message corresponding to the selector value
+</ResponseField>
+
+#### Example: Gender
+
+```typescript
+say.select(userGender, {
+  male: 'He liked your post',
+  female: 'She liked your post',
+  other: 'They liked your post',
+});
+```
+
+**Compile-time transformation:**
+
+```typescript
+// Before
+say.select(userGender, {
+  male: 'He liked your post',
+  female: 'She liked your post',
+  other: 'They liked your post',
+});
+
+// After
+say.call({
+  id: 'sel456',
+  userGender: userGender,
+});
+```
+
+**Extracted message:**
+
+```json
+{
+  "sel456": "{userGender, select, male {He liked your post} female {She liked your post} other {They liked your post}}"
+}
+```
+
+#### Example: Status
+
+```typescript
+say.select(orderStatus, {
+  pending: 'Order is being processed',
+  shipped: 'Order is on its way',
+  delivered: 'Order has been delivered',
+  other: 'Unknown status',
+});
+```
+
+## Nesting Macros
+
+You can nest macros for complex messages:
+
+```typescript
+say`${user.name} has ${say.plural(count, {
+  one: 'one unread message',
+  other: '# unread messages',
+})}`;
+```
+
+**Extracted message:**
+
+```json
+{
+  "msg123": "{userName} has {count, plural, one {one unread message} other {# unread messages}}"
+}
+```
+
+## Translator Comments
+
+Add comments to provide context for translators:
+
+```typescript
+// translators: This appears on the user profile page
+say`Edit Profile`;
+
+// translators: Shown when no search results are found
+say`No results for "${query}"`;
+```
+
+These comments are extracted alongside the messages and included in translation files.
+
+## Requirements
+
+<Warning>
+  All macros require the **Saykit Babel plugin** to be configured in your build system.
+</Warning>
+
+### Installation
+
+```bash
+npm install --save-dev @saykit/plugin-babel
+```
+
+### Configuration
+
+Add the plugin to your Babel configuration:
+
+```javascript .babelrc.js
+module.exports = {
+  plugins: [
+    ['@saykit/plugin-babel', {
+      // Plugin options
+    }]
+  ]
+};
+```
+
+See the [Babel Plugin Guide](/integrations/babel) for complete setup instructions.
+
+## How It Works
+
+The Babel plugin performs the following transformations:
+
+1. **Parse**: Identifies all `say` macro calls in your code
+2. **Extract**: Extracts the message content and generates an ID (hash or custom)
+3. **Transform**: Replaces the macro with a runtime `say.call()` invocation
+4. **Output**: Writes extracted messages to locale files
+
+### Example Flow
+
+**Source code:**
+
+```typescript src/app.ts
+const message = say`Hello, ${name}!`;
+```
+
+**After Babel transformation:**
+
+```typescript
+const message = say.call({ id: 'abc123', name });
+```
+
+**Extracted to locale file:**
+
+```json en.json
+{
+  "abc123": "Hello, {name}!"
+}
+```
+
+**At runtime:**
+
+The `say.call()` method looks up `abc123` in the active locale's messages, interpolates the `name` variable, and returns the formatted string.
+
+## Related
+
+- [Say Class](/api/say-class) - Runtime API for translations
+- [Babel Plugin](/integrations/babel) - Configuration and setup
+- [Message Extraction](/guides/message-extraction) - How messages are extracted from code

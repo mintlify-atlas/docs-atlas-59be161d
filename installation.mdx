@@ -1,0 +1,173 @@
+---
+title: Installation
+description: Install Saykit and set up internationalization in your project
+---
+
+## Install Saykit
+
+Install the core Saykit package and any framework-specific packages you need:
+
+<CodeGroup>
+
+```bash npm
+npm install saykit
+```
+
+```bash yarn
+yarn add saykit
+```
+
+```bash pnpm
+pnpm add saykit
+```
+
+</CodeGroup>
+
+## Available Packages
+
+Saykit provides several packages for different use cases:
+
+### Core Packages
+
+- **`saykit`** - Core runtime library with the `Say` class and message formatting
+- **`@saykit/config`** - Configuration schema and CLI tools for extracting, compiling, and building translations
+
+### Framework Integrations
+
+- **`@saykit/react`** - React integration with `<Say>` component and hooks for client and server components
+
+### Build Tools
+
+- **`@saykit/babel-plugin`** - Babel plugin to transform `say` template literals into message calls
+- **`unplugin-saykit`** - Universal plugin for Vite, Webpack, Rollup, esbuild, and more
+
+## Framework-Specific Setup
+
+<Tabs>
+  <Tab title="React (Next.js with Babel)">
+    Install the React integration and Babel plugin:
+
+    <CodeGroup>
+
+    ```bash npm
+    npm install saykit @saykit/react
+    npm install -D @saykit/config @saykit/babel-plugin
+    ```
+
+    ```bash yarn
+    yarn add saykit @saykit/react
+    yarn add -D @saykit/config @saykit/babel-plugin
+    ```
+
+    ```bash pnpm
+    pnpm add saykit @saykit/react
+    pnpm add -D @saykit/config @saykit/babel-plugin
+    ```
+
+    </CodeGroup>
+
+    Configure Babel by creating or updating `.babelrc`:
+
+    ```json .babelrc
+    {
+      "presets": ["next/babel"],
+      "plugins": ["@saykit/babel-plugin"]
+    }
+    ```
+  </Tab>
+
+  <Tab title="Vite / Rollup / Webpack">
+    Install the core package and unplugin:
+
+    <CodeGroup>
+
+    ```bash npm
+    npm install saykit
+    npm install -D @saykit/config unplugin-saykit
+    ```
+
+    ```bash yarn
+    yarn add saykit
+    yarn add -D @saykit/config unplugin-saykit
+    ```
+
+    ```bash pnpm
+    pnpm add saykit
+    pnpm add -D @saykit/config unplugin-saykit
+    ```
+
+    </CodeGroup>
+
+    Configure your bundler:
+
+    <CodeGroup>
+
+    ```ts vite.config.ts
+    import { defineConfig } from 'vite';
+    import saykit from 'unplugin-saykit/vite';
+
+    export default defineConfig({
+      plugins: [saykit()],
+    });
+    ```
+
+    ```ts webpack.config.js
+    const saykit = require('unplugin-saykit/webpack');
+
+    module.exports = {
+      plugins: [saykit()],
+    };
+    ```
+
+    ```ts rollup.config.js
+    import saykit from 'unplugin-saykit/rollup';
+
+    export default {
+      plugins: [saykit()],
+    };
+    ```
+
+    </CodeGroup>
+  </Tab>
+
+  <Tab title="Vanilla JavaScript">
+    Install the core package and Babel plugin:
+
+    <CodeGroup>
+
+    ```bash npm
+    npm install saykit
+    npm install -D @saykit/config @saykit/babel-plugin
+    ```
+
+    ```bash yarn
+    yarn add saykit
+    yarn add -D @saykit/config @saykit/babel-plugin
+    ```
+
+    ```bash pnpm
+    pnpm add saykit
+    pnpm add -D @saykit/config @saykit/babel-plugin
+    ```
+
+    </CodeGroup>
+
+    Configure Babel by creating `.babelrc`:
+
+    ```json .babelrc
+    {
+      "plugins": ["@saykit/babel-plugin"]
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Next Steps
+
+After installation, you'll need to:
+
+1. Create a `saykit.config.ts` file to configure your locales and message extraction
+2. Set up your `Say` instance and start adding translatable messages
+3. Use the CLI to extract, compile, and build your translations
+
+Continue to the [Quickstart](/quickstart) guide to learn how to use Saykit in your project.

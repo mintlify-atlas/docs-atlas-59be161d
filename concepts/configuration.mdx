@@ -1,0 +1,292 @@
+---
+title: Configuration
+description: Configure Saykit's extraction, compilation, and locale management
+---
+
+Saykit uses a `saykit.config.ts` file to define your internationalization setup. This configuration controls message extraction, locale management, and output formatting.
+
+## Configuration File
+
+Create a `saykit.config.ts` in your project root:
+
+```typescript saykit.config.ts
+import { defineConfig } from '@saykit/config';
+
+export default defineConfig({
+  sourceLocale: 'en',
+  locales: ['en', 'fr', 'es'],
+  buckets: [
+    {
+      include: ['src/**/*.{ts,tsx}'],
+      output: 'src/locales/{locale}/messages.{extension}',
+    },
+  ],
+});
+```
+
+## Configuration Schema
+
+The configuration is type-checked using Zod schemas at runtime:
+
+**Location:** `packages/config/src/shapes.ts:74-85`
+
+### Configuration Type
+
+<ParamField path="sourceLocale" type="string" required>
+  The source locale for your application. This must match the first locale in the `locales` array.
+  
+  ```typescript
+  sourceLocale: 'en'
+  ```
+</ParamField>
+
+<ParamField path="locales" type="string[]" required>
+  Array of supported locales. The first locale must be the source locale.
+  
+  ```typescript
+  locales: ['en', 'fr', 'es', 'de']
+  ```
+</ParamField>
+
+<ParamField path="fallbackLocales" type="Record<string, string[]>">
+  Define fallback chains for locales. If a message isn't found in a locale, Saykit will check the fallback locales in order.
+  
+  ```typescript
+  fallbackLocales: {
+    'en-GB': ['en'],
+    'fr-CA': ['fr', 'en'],
+    'es-MX': ['es', 'en']
+  }
+  ```
+</ParamField>
+
+<ParamField path="buckets" type="Bucket[]" required>
+  Array of bucket configurations that define which files to extract from and where to output translations.
+  
+  See [Bucket Configuration](#bucket-configuration) below.
+</ParamField>
+
+## Bucket Configuration
+
+Buckets group related messages and control extraction and output:
+
+<ParamField path="include" type="string[]" required>
+  Glob patterns for files to extract messages from.
+  
+  ```typescript
+  include: ['src/**/*.{ts,tsx}', 'lib/**/*.js']
+  ```
+</ParamField>
+
+<ParamField path="exclude" type="string[]">
+  Glob patterns for files to exclude from extraction.
+  
+  ```typescript
+  exclude: ['**/*.test.ts', '**/*.spec.tsx']
+  ```
+</ParamField>
+
+<ParamField path="output" type="string" required>
+  Output path template with `{locale}` and `{extension}` placeholders.
+  
+  ```typescript
+  output: 'src/locales/{locale}/messages.{extension}'
+  // Generates:
+  // - src/locales/en/messages.po
+  // - src/locales/fr/messages.po
+  ```
+</ParamField>
+
+<ParamField path="formatter" type="Formatter">
+  Custom formatter for message serialization. Defaults to `@saykit/format-po`.
+  
+  See [Formatter Configuration](#formatter-configuration) below.
+</ParamField>
+
+## Formatter Configuration
+
+Formatters control how messages are serialized to disk:
+
+**Location:** `packages/config/src/shapes.ts:18-27`
+
+<ParamField path="extension" type="string" required>
+  File extension (without the dot).
+  
+  ```typescript
+  extension: 'po'
+  ```
+</ParamField>
+
+<ParamField path="parse" type="(content: string, context: { locale: string }) => Promise<Message[]>" required>
+  Function to parse file content into messages.
+  
+  ```typescript
+  parse: async (content, { locale }) => {
+    // Parse content and return Message[]
+    return messages;
+  }
+  ```
+</ParamField>
+
+<ParamField path="stringify" type="(messages: Message[], context: { locale: string }) => Promise<string>" required>
+  Function to serialize messages to file content.
+  
+  ```typescript
+  stringify: async (messages, { locale }) => {
+    // Convert messages to string format
+    return serialized;
+  }
+  ```
+</ParamField>
+
+## Message Type
+
+Messages follow this structure during extraction:
+
+**Location:** `packages/config/src/shapes.ts:8-16`
+
+```typescript
+interface Message {
+  message: string;        // The ICU MessageFormat string
+  translation?: string;   // The translated version (if available)
+  id?: string;           // Custom ID or generated hash
+  context?: string;      // Disambiguation context
+  comments: string[];    // Translator comments from code
+  references: string[];  // Source file locations (file:line)
+}
+```
+
+## Example Configurations
+
+### Monorepo Setup
+
+Extract messages from multiple packages:
+
+```typescript saykit.config.ts
+import { defineConfig } from '@saykit/config';
+
+export default defineConfig({
+  sourceLocale: 'en',
+  locales: ['en', 'fr', 'es'],
+  buckets: [
+    {
+      include: ['packages/ui/**/*.{ts,tsx}'],
+      exclude: ['**/*.test.ts'],
+      output: 'packages/ui/locales/{locale}/messages.{extension}',
+    },
+    {
+      include: ['packages/admin/**/*.{ts,tsx}'],
+      exclude: ['**/*.test.ts'],
+      output: 'packages/admin/locales/{locale}/messages.{extension}',
+    },
+  ],
+});
+```
+
+### With Fallback Locales
+
+Handle regional variations with fallbacks:
+
+```typescript saykit.config.ts
+import { defineConfig } from '@saykit/config';
+
+export default defineConfig({
+  sourceLocale: 'en',
+  locales: ['en', 'en-GB', 'en-AU', 'fr', 'fr-CA'],
+  fallbackLocales: {
+    'en-GB': ['en'],
+    'en-AU': ['en-GB', 'en'],
+    'fr-CA': ['fr', 'en'],
+  },
+  buckets: [
+    {
+      include: ['src/**/*.{ts,tsx}'],
+      output: 'locales/{locale}.{extension}',
+    },
+  ],
+});
+```
+
+### Custom Formatter
+
+Use a custom JSON formatter instead of PO files:
+
+```typescript saykit.config.ts
+import { defineConfig } from '@saykit/config';
+
+export default defineConfig({
+  sourceLocale: 'en',
+  locales: ['en', 'fr'],
+  buckets: [
+    {
+      include: ['src/**/*.tsx'],
+      output: 'src/i18n/{locale}.{extension}',
+      formatter: {
+        extension: 'json',
+        parse: async (content) => {
+          const data = JSON.parse(content);
+          return Object.entries(data).map(([id, message]) => ({
+            message: message as string,
+            translation: message as string,
+            id,
+            comments: [],
+            references: [],
+          }));
+        },
+        stringify: async (messages) => {
+          const data = Object.fromEntries(
+            messages.map((m) => [
+              m.id || generateHash(m.message),
+              m.translation || m.message,
+            ])
+          );
+          return JSON.stringify(data, null, 2);
+        },
+      },
+    },
+  ],
+});
+```
+
+## CLI Commands
+
+Once configured, use these commands:
+
+<CodeGroup>
+```bash Extract
+# Extract messages from source files
+saykit extract
+```
+
+```bash Compile
+# Compile PO files to JSON for runtime
+saykit compile
+```
+
+```bash Build
+# Extract and compile in one step
+saykit build
+```
+</CodeGroup>
+
+**CLI Location:** `packages/config/src/commands/`
+
+## Configuration Loading
+
+Saykit automatically searches for configuration files:
+
+1. `saykit.config.ts`
+2. `saykit.config.js`
+3. `saykit.config.mjs`
+4. `saykit.config.cjs`
+5. `.saykitrc.json`
+
+**Location:** `packages/config/src/features/loader/`
+
+<Tip>
+  Use `defineConfig` for TypeScript autocompletion and type checking in your configuration file.
+</Tip>
+
+<Warning>
+  The `sourceLocale` must always be the first item in the `locales` array. This is validated at runtime.
+</Warning>

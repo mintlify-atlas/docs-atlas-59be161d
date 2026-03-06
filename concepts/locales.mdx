@@ -1,0 +1,476 @@
+---
+title: Locale Management
+description: Manage locales, load translations, and handle fallbacks with the Say class
+---
+
+The `Say` class manages locale state, message loading, and translation lookups at runtime.
+
+## Creating a Say Instance
+
+Instantiate the Say class with your locales and messages:
+
+```typescript
+import { Say } from 'saykit';
+
+const say = new Say({
+  locales: ['en', 'fr', 'es'],
+  messages: {
+    en: await import('./locales/en/messages.json').then(m => m.default),
+    fr: await import('./locales/fr/messages.json').then(m => m.default),
+    es: await import('./locales/es/messages.json').then(m => m.default),
+  },
+});
+```
+
+**Location:** `packages/integration/src/runtime.ts:76-81`
+
+## Constructor Options
+
+The Say constructor accepts different option patterns:
+
+### With Pre-loaded Messages
+
+```typescript
+const say = new Say({
+  locales: ['en', 'fr'],
+  messages: {
+    en: enMessages,
+    fr: frMessages,
+  },
+});
+```
+
+### With Lazy Loading
+
+```typescript
+const say = new Say({
+  locales: ['en', 'fr', 'es'],
+  messages: {},  // Can be empty or partial
+  loader: async (locale) => {
+    const data = await import(`./locales/${locale}/messages.json`);
+    return data.default;
+  },
+});
+```
+
+### Hybrid Approach
+
+```typescript
+const say = new Say({
+  locales: ['en', 'fr', 'es', 'de'],
+  messages: {
+    en: enMessages,  // Pre-load default locale
+    fr: frMessages,  // Pre-load commonly used locale
+  },
+  loader: async (locale) => {
+    // Lazy load other locales
+    const data = await import(`./locales/${locale}/messages.json`);
+    return data.default;
+  },
+});
+```
+
+**Type Definition:** `packages/integration/src/runtime.ts:16-24`
+
+## Loading Messages
+
+The `load()` method loads messages for one or more locales:
+
+### Load All Locales
+
+```typescript
+await say.load();
+```
+
+Loads messages for all locales defined in the constructor.
+
+### Load Specific Locales
+
+```typescript
+await say.load('fr', 'es');
+```
+
+Loads only the specified locales.
+
+### Synchronous Loading
+
+If your loader is synchronous, `load()` returns `this` immediately:
+
+```typescript
+const say = new Say({
+  locales: ['en', 'fr'],
+  messages: { en: enMessages, fr: frMessages },
+});
+
+say.load();  // Returns immediately
+```
+
+**Location:** `packages/integration/src/runtime.ts:114-134`
+
+<Note>
+  Messages are only loaded once per locale. Calling `load()` multiple times for the same locale is a no-op.
+</Note>
+
+## Activating a Locale
+
+Set the active locale with `activate()`:
+
+```typescript
+say.activate('fr');
+```
+
+This sets the locale used for all subsequent message lookups.
+
+**Location:** `packages/integration/src/runtime.ts:173-182`
+
+### Requirements
+
+<Warning>
+  Messages must be loaded before activating a locale. If messages aren't loaded, `activate()` throws an error:
+  
+  ```
+  Error: No messages loaded for locale
+  ```
+</Warning>
+
+### Typical Flow
+
+```typescript
+// 1. Create instance
+const say = new Say({ /* ... */ });
+
+// 2. Load messages
+await say.load();
+
+// 3. Activate a locale
+say.activate('en');
+
+// 4. Use messages
+const message = say`Hello, world!`;
+```
+
+## Assigning Messages
+
+Manually assign or update messages with `assign()`:
+
+### Bulk Assignment
+
+```typescript
+say.assign({
+  en: enMessages,
+  fr: frMessages,
+});
+```
+
+### Single Locale
+
+```typescript
+say.assign('es', esMessages);
+```
+
+**Location:** `packages/integration/src/runtime.ts:141-164`
+
+### Use Cases
+
+- Hot-reloading translations in development
+- Updating translations after fetching from an API
+- Patching specific messages at runtime
+
+```typescript
+// Example: Fetch updated translations
+const updates = await fetch(`/api/translations/${locale}`);
+const messages = await updates.json();
+say.assign(locale, messages);
+```
+
+## Locale Matching
+
+The `match()` method finds the best locale from a list of candidates:
+
+```typescript
+const say = new Say({
+  locales: ['en', 'fr', 'es'],
+  messages: { /* ... */ },
+});
+
+// Exact match
+say.match(['fr']);  // Returns 'fr'
+
+// Prefix match
+say.match(['fr-CA']);  // Returns 'fr'
+
+// Multiple candidates
+say.match(['de', 'fr', 'en']);  // Returns 'fr' (first match)
+
+// No match - returns first locale
+say.match(['ja']);  // Returns 'en' (default)
+```
+
+**Location:** `packages/integration/src/runtime.ts:251-263`
+
+### Matching Algorithm
+
+1. **Exact match**: Check if any candidate exactly matches a supported locale
+2. **Prefix match**: Check if any candidate's language code (before `-`) matches a supported locale
+3. **Fallback**: Return the first locale (source locale)
+
+### Integration with Browser APIs
+
+```typescript
+// Use browser language preferences
+const userLocale = say.match(navigator.languages);
+say.activate(userLocale);
+```
+
+```typescript
+// Use Accept-Language header in Node.js
+import { parse } from 'accept-language-parser';
+
+const accepted = parse(req.headers['accept-language']);
+const locales = accepted.map(a => a.code);
+const userLocale = say.match(locales);
+say.activate(userLocale);
+```
+
+## Fallback Locales
+
+Configure fallback locales in your `saykit.config.ts`:
+
+```typescript saykit.config.ts
+export default defineConfig({
+  sourceLocale: 'en',
+  locales: ['en', 'en-GB', 'fr', 'fr-CA'],
+  fallbackLocales: {
+    'en-GB': ['en'],
+    'fr-CA': ['fr', 'en'],
+  },
+  // ...
+});
+```
+
+<Note>
+  Fallback locales are primarily used during extraction and compilation. At runtime, if a message is missing, the source message is used.
+</Note>
+
+## Reading Locale State
+
+### Current Locale
+
+Get the active locale:
+
+```typescript
+const currentLocale = say.locale;
+```
+
+<Warning>
+  Throws an error if no locale is activated:
+  
+  ```
+  Error: No active locale
+  ```
+</Warning>
+
+**Location:** `packages/integration/src/runtime.ts:88-91`
+
+### Current Messages
+
+Get the message catalog for the active locale:
+
+```typescript
+const messages = say.messages;
+// { "a1b2c3": "Hello, world!", ... }
+```
+
+<Warning>
+  Throws an error if:
+  - No locale is activated
+  - No messages are loaded for the active locale
+</Warning>
+
+**Location:** `packages/integration/src/runtime.ts:99-103`
+
+## Working with Multiple Locales
+
+The Say class provides iteration methods for working with all locales:
+
+### map()
+
+Transform each locale:
+
+```typescript
+const pages = say.map(([instance, locale]) => {
+  return {
+    locale,
+    content: instance`Welcome!`,
+  };
+});
+
+// [
+//   { locale: 'en', content: 'Welcome!' },
+//   { locale: 'fr', content: 'Bienvenue!' },
+//   { locale: 'es', content: '¡Bienvenido!' },
+// ]
+```
+
+**Location:** `packages/integration/src/runtime.ts:206-216`
+
+### reduce()
+
+Accumulate across locales:
+
+```typescript
+const allMessages = say.reduce((acc, [instance, locale]) => {
+  acc[locale] = {
+    greeting: instance`Hello!`,
+    farewell: instance`Goodbye!`,
+  };
+  return acc;
+}, {} as Record<string, any>);
+```
+
+**Location:** `packages/integration/src/runtime.ts:224-236`
+
+### Iteration
+
+Use for...of to iterate:
+
+```typescript
+for (const [instance, locale] of say) {
+  console.log(locale, instance`Hello!`);
+}
+
+// en Hello!
+// fr Bonjour!
+// es ¡Hola!
+```
+
+**Location:** `packages/integration/src/runtime.ts:238-242`
+
+<Tip>
+  Each iteration provides a cloned Say instance with the locale pre-activated, so you can safely use macros in parallel contexts.
+</Tip>
+
+## Cloning
+
+Create an independent copy of a Say instance:
+
+```typescript
+const clone = say.clone();
+clone.activate('fr');
+
+// Original instance is unaffected
+console.log(say.locale);  // Still 'en'
+console.log(clone.locale);  // 'fr'
+```
+
+**Location:** `packages/integration/src/runtime.ts:189-195`
+
+### Use Cases
+
+- Server-side rendering with concurrent requests
+- Testing different locales in parallel
+- Isolating locale state in different contexts
+
+## Freezing
+
+Prevent modifications to a Say instance:
+
+```typescript
+const readonlySay = say.freeze();
+
+// These will throw errors:
+readonlySay.activate('fr');  // Error: Cannot activate locale on a frozen Say
+readonlySay.load();          // Error: Cannot load messages on a frozen Say
+readonlySay.assign('en', {}); // Error: Cannot assign messages on a frozen Say
+```
+
+**Location:** `packages/integration/src/runtime.ts:197-199`
+
+<Tip>
+  Useful for creating immutable global instances that shouldn't be modified after initialization.
+</Tip>
+
+## Example: Server-Side Rendering
+
+Typical pattern for SSR frameworks:
+
+```typescript
+// i18n.ts - Server-only instance
+import 'server-only';
+import { Say } from 'saykit';
+
+const say = new Say({
+  locales: ['en', 'fr', 'es'],
+  messages: {
+    en: await import('./locales/en/messages.json').then(m => m.default),
+    fr: await import('./locales/fr/messages.json').then(m => m.default),
+    es: await import('./locales/es/messages.json').then(m => m.default),
+  },
+});
+
+export default say;
+```
+
+```typescript
+// page.tsx - Per-request locale
+import say from './i18n';
+
+export default async function Page({ params }) {
+  const locale = (await params).locale;
+  const localizedSay = say.clone().activate(locale);
+  
+  return (
+    <div>
+      <h1>{localizedSay`Welcome!`}</h1>
+    </div>
+  );
+}
+```
+
+**Example:** `examples/nextjs-babel/src/i18n.ts`
+
+## Example: Client-Side
+
+Client-side with lazy loading:
+
+```typescript
+import { Say } from 'saykit';
+
+const say = new Say({
+  locales: ['en', 'fr', 'es'],
+  messages: {
+    en: await import('./locales/en/messages.json').then(m => m.default),
+  },
+  loader: async (locale) => {
+    const data = await import(`./locales/${locale}/messages.json`);
+    return data.default;
+  },
+});
+
+say.load();  // Load default locale
+say.activate('en');
+
+// Later: Switch locale
+async function switchLocale(locale: string) {
+  await say.load(locale);
+  say.activate(locale);
+}
+
+export default say;
+```
+
+**Example:** `examples/carbon-tsdown/src/i18n.ts`
+
+<Card title="Type Safety" icon="shield">
+  The Say class is fully generic and enforces type safety:
+  
+  ```typescript
+  const say = new Say({
+    locales: ['en', 'fr'] as const,
+    messages: { en: {}, fr: {} },
+  });
+  
+  say.activate('en');  // ✅ OK
+  say.activate('es');  // ❌ Type error: 'es' not in ['en', 'fr']
+  ```
+</Card>

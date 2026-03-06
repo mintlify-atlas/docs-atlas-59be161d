@@ -1,0 +1,225 @@
+---
+title: Message Extraction
+description: Automatically extract translatable messages from your source code
+---
+
+Saykit can automatically extract messages from your source code and generate translation files. This guide shows you how to set up and use the extraction feature.
+
+## Overview
+
+The extraction process:
+1. Scans your source files for `say` function calls
+2. Extracts message IDs, default text, and context
+3. Generates or updates translation files in your specified format
+4. Preserves existing translations when re-running extraction
+
+## Configuration
+
+### Define Buckets
+
+Buckets determine which files to scan and where to output translation files. Configure them in your `saykit.config.ts`:
+
+```ts saykit.config.ts
+import { defineConfig } from '@saykit/config';
+
+export default defineConfig({
+  sourceLocale: 'en',
+  locales: ['en', 'fr', 'es'],
+  buckets: [
+    {
+      include: ['src/**/*.{ts,tsx}'],
+      output: 'src/locales/{locale}/messages.{extension}',
+    },
+  ],
+});
+```
+
+### Bucket Properties
+
+<Accordion title="include">
+  Array of glob patterns for files to scan. Supports standard glob syntax:
+  - `**` matches any number of directories
+  - `*` matches any characters except `/`
+  - `{ts,tsx}` matches multiple extensions
+</Accordion>
+
+<Accordion title="exclude (optional)">
+  Array of glob patterns to exclude from scanning:
+  
+  ```ts
+  buckets: [
+    {
+      include: ['src/**/*.ts'],
+      exclude: ['src/**/*.test.ts', 'src/__tests__/**'],
+      output: 'locales/{locale}.{extension}',
+    },
+  ]
+  ```
+</Accordion>
+
+<Accordion title="output">
+  Path template for generated files. Must include:
+  - `{locale}` placeholder for the locale code
+  - `{extension}` placeholder for the file extension
+  
+  Examples:
+  - `src/locales/{locale}/messages.{extension}`
+  - `i18n/{locale}.{extension}`
+  - `translations/{locale}/LC_MESSAGES/messages.{extension}`
+</Accordion>
+
+<Accordion title="formatter (optional)">
+  Custom formatter for translation files. Defaults to the PO format.
+  
+  See [Custom Formatters](/guides/custom-formatters) for details.
+</Accordion>
+
+## Running Extraction
+
+<Steps>
+  <Step title="Install Saykit CLI">
+    Make sure you have the Saykit CLI installed:
+    
+    ```bash
+    npm install -D @saykit/config
+    ```
+  </Step>
+  
+  <Step title="Run the Extract Command">
+    Extract messages from your configured buckets:
+    
+    ```bash
+    npx saykit extract
+    ```
+    
+    Add flags for more control:
+    - `--verbose` or `-v`: Show detailed extraction information
+    - `--quiet` or `-q`: Suppress all output except errors
+  </Step>
+  
+  <Step title="Review Generated Files">
+    Check the output directory for your translation files. By default, files are generated in PO format:
+    
+    ```po src/locales/en/messages.po
+    msgid ""
+    msgstr ""
+    "Content-Type: text/plain; charset=UTF-8\n"
+    "Language: en\n"
+    "X-Generator: saykit\n"
+    
+    msgid "Welcome, {name}!"
+    msgstr "Welcome, {name}!"
+    
+    msgid "Loading..."
+    msgstr "Loading..."
+    ```
+  </Step>
+</Steps>
+
+## Output Format
+
+The default PO format includes:
+
+- **msgid**: The source message text
+- **msgstr**: The translated text (empty for new messages)
+- **msgctxt**: Context to disambiguate identical strings
+- **Extracted comments**: Custom ID or translator notes
+- **References**: Source file locations where the message is used
+
+### Example with Context
+
+```typescript
+// In your code
+say({ context: 'direction' })`Right`;
+say({ context: 'correctness' })`Right`;
+```
+
+```po
+# Extracted from src/navigation.ts:42
+msgctxt "direction"
+msgid "Right"
+msgstr "Right"
+
+# Extracted from src/quiz.ts:15
+msgctxt "correctness"
+msgid "Right"
+msgstr "Right"
+```
+
+### Example with Custom ID
+
+```typescript
+// In your code
+say({ id: 'welcome.greeting' })`Hello, {name}!`;
+```
+
+```po
+# id:welcome.greeting
+# Extracted from src/pages/home.tsx:10
+msgid "Hello, {name}!"
+msgstr "Hello, {name}!"
+```
+
+## Workflow Tips
+
+<Note>
+  Re-running extraction is safe and non-destructive. Existing translations are preserved, and only new or changed messages are updated.
+</Note>
+
+### Development Workflow
+
+1. Write code using `say` functions
+2. Run `npx saykit extract` to generate/update translation files
+3. Commit both source code and extracted files
+4. Translators work on the generated files
+5. Repeat as you add more messages
+
+### CI/CD Integration
+
+Add extraction to your CI pipeline to catch missing translations:
+
+```bash
+# Extract and check for changes
+npx saykit extract
+git diff --exit-code src/locales/
+```
+
+This will fail if there are uncommitted translation updates.
+
+<Warning>
+  Always commit extracted source locale files (e.g., `en/messages.po`) to version control. These serve as the source of truth for translators.
+</Warning>
+
+## Multiple Buckets
+
+Use multiple buckets to organize translations by feature or module:
+
+```ts saykit.config.ts
+export default defineConfig({
+  sourceLocale: 'en',
+  locales: ['en', 'fr', 'es'],
+  buckets: [
+    {
+      include: ['src/components/**/*.tsx'],
+      output: 'src/locales/{locale}/components.{extension}',
+    },
+    {
+      include: ['src/pages/**/*.tsx'],
+      output: 'src/locales/{locale}/pages.{extension}',
+    },
+    {
+      include: ['src/lib/**/*.ts'],
+      exclude: ['src/lib/**/*.test.ts'],
+      output: 'src/locales/{locale}/lib.{extension}',
+    },
+  ],
+});
+```
+
+Each bucket generates separate translation files, making it easier to manage large projects or split translation work across teams.
+
+## Next Steps
+
+- Learn about [Custom Formatters](/guides/custom-formatters) for alternative file formats
+- Explore [Pluralization](/guides/pluralization) for handling countable messages
+- See [TypeScript](/guides/typescript) for type-safe configuration

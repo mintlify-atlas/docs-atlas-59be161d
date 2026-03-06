@@ -1,0 +1,504 @@
+---
+title: Unplugin
+description: Universal build plugin for Vite, webpack, esbuild, Rollup, and more
+---
+
+The `unplugin-saykit` package provides a universal plugin that works across multiple build tools, transforming Saykit messages at build time without requiring Babel.
+
+## Installation
+
+```bash
+npm install --save-dev unplugin-saykit
+```
+
+## Supported Bundlers
+
+The unplugin works with:
+
+- **Vite** (recommended for modern projects)
+- **webpack** 4, 5
+- **Rollup** 2, 3, 4
+- **esbuild**
+- **Rspack**
+- **Farm**
+- **Rolldown**
+
+## Basic Usage
+
+### Vite
+
+```ts vite.config.ts
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import saykit from 'unplugin-saykit/vite';
+
+export default defineConfig({
+  plugins: [
+    react(),
+    saykit(),
+  ],
+});
+```
+
+### webpack
+
+```js webpack.config.js
+const SaykitPlugin = require('unplugin-saykit/webpack');
+
+module.exports = {
+  plugins: [
+    SaykitPlugin(),
+  ],
+};
+```
+
+For TypeScript configuration:
+
+```ts webpack.config.ts
+import SaykitPlugin from 'unplugin-saykit/webpack';
+
+export default {
+  plugins: [
+    SaykitPlugin(),
+  ],
+};
+```
+
+### Rollup
+
+```js rollup.config.js
+import saykit from 'unplugin-saykit/rollup';
+
+export default {
+  plugins: [
+    saykit(),
+  ],
+};
+```
+
+### esbuild
+
+```js build.js
+const esbuild = require('esbuild');
+const saykitPlugin = require('unplugin-saykit/esbuild');
+
+esbuild.build({
+  entryPoints: ['src/index.tsx'],
+  bundle: true,
+  plugins: [saykitPlugin()],
+  outfile: 'dist/bundle.js',
+});
+```
+
+### Rspack
+
+```ts rspack.config.ts
+import { defineConfig } from '@rspack/cli';
+import saykit from 'unplugin-saykit/rspack';
+
+export default defineConfig({
+  plugins: [
+    saykit(),
+  ],
+});
+```
+
+### Farm
+
+```ts farm.config.ts
+import { defineConfig } from '@farmfe/core';
+import saykit from 'unplugin-saykit/farm';
+
+export default defineConfig({
+  plugins: [
+    saykit(),
+  ],
+});
+```
+
+## Configuration Options
+
+The plugin accepts an optional configuration object:
+
+```ts
+saykit({
+  // Configuration options (currently no options available)
+})
+```
+
+The plugin automatically:
+- Excludes `node_modules` from processing
+- Processes supported file extensions (`.js`, `.jsx`, `.ts`, `.tsx`, `.mjs`, `.cjs`, `.mts`, `.cts`)
+- Uses the Saykit Babel transformer under the hood
+
+## How It Works
+
+<Steps>
+  <Step title="File Filtering">
+    The plugin intercepts file transforms and filters out files in `node_modules`.
+  </Step>
+  
+  <Step title="Code Transformation">
+    For each eligible file, it uses `@saykit/babel-plugin/core` to transform the code:
+    
+    ```ts
+    import { transformCode } from '@saykit/babel-plugin/core';
+    
+    // Applied automatically by the plugin
+    const transformed = transformCode(fileId, sourceCode);
+    ```
+  </Step>
+  
+  <Step title="Build Integration">
+    The transformed code is returned to the build tool's pipeline for further processing.
+  </Step>
+</Steps>
+
+## Framework Examples
+
+### Next.js with SWC
+
+Next.js 13+ uses SWC by default, which doesn't support Babel plugins. Use the webpack plugin:
+
+```js next.config.js
+const SaykitPlugin = require('unplugin-saykit/webpack');
+
+module.exports = {
+  webpack: (config) => {
+    config.plugins.push(SaykitPlugin());
+    return config;
+  },
+};
+```
+
+### Vite + React
+
+```ts vite.config.ts
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import saykit from 'unplugin-saykit/vite';
+
+export default defineConfig({
+  plugins: [
+    react(),
+    saykit(),
+  ],
+});
+```
+
+### Vite + Vue
+
+```ts vite.config.ts
+import { defineConfig } from 'vite';
+import vue from '@vitejs/plugin-vue';
+import saykit from 'unplugin-saykit/vite';
+
+export default defineConfig({
+  plugins: [
+    vue(),
+    saykit(),
+  ],
+});
+```
+
+### SvelteKit
+
+```ts vite.config.ts
+import { sveltekit } from '@sveltejs/kit/vite';
+import saykit from 'unplugin-saykit/vite';
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+  plugins: [
+    sveltekit(),
+    saykit(),
+  ],
+});
+```
+
+### Remix with Vite
+
+```ts vite.config.ts
+import { vitePlugin as remix } from '@remix-run/dev';
+import saykit from 'unplugin-saykit/vite';
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+  plugins: [
+    remix(),
+    saykit(),
+  ],
+});
+```
+
+### Astro
+
+```ts astro.config.mjs
+import { defineConfig } from 'astro/config';
+import saykit from 'unplugin-saykit/vite';
+
+export default defineConfig({
+  vite: {
+    plugins: [saykit()],
+  },
+});
+```
+
+## Transformations
+
+The unplugin applies the same transformations as the Babel plugin. See the [Babel Plugin documentation](/integrations/babel#transformation-examples) for detailed transformation examples.
+
+### Quick Reference
+
+<Tabs>
+  <Tab title="JSX">
+    ```tsx
+    // Before
+    <Say>Hello, {name}!</Say>
+    
+    // After
+    <Say id="abc123" name={name} />
+    ```
+  </Tab>
+  
+  <Tab title="Plural">
+    ```tsx
+    // Before
+    <Say.Plural
+      _={count}
+      one="One item"
+      other="# items"
+    />
+    
+    // After
+    <Say id="def456" _={count} />
+    ```
+  </Tab>
+  
+  <Tab title="Ordinal">
+    ```tsx
+    // Before
+    <Say.Ordinal
+      _={position}
+      _1="#st"
+      _2="#nd"
+      other="#th"
+    />
+    
+    // After
+    <Say id="ghi789" _={position} />
+    ```
+  </Tab>
+  
+  <Tab title="Select">
+    ```tsx
+    // Before
+    <Say.Select
+      _={gender}
+      male="He"
+      female="She"
+      other="They"
+    />
+    
+    // After
+    <Say id="jkl012" _={gender} />
+    ```
+  </Tab>
+</Tabs>
+
+## Performance
+
+### Build Time
+
+The unplugin adds minimal overhead to your build:
+
+- Files in `node_modules` are automatically skipped
+- Only files with Saykit usage are transformed
+- Transformations are cached by the build tool
+
+### Development Experience
+
+<Tabs>
+  <Tab title="Vite">
+    - Fast Hot Module Replacement (HMR)
+    - Minimal impact on dev server startup
+    - Only transforms changed files
+  </Tab>
+  
+  <Tab title="webpack">
+    - Integrates with webpack's caching layer
+    - Works with webpack-dev-server
+    - Supports watch mode
+  </Tab>
+  
+  <Tab title="esbuild">
+    - Leverages esbuild's speed
+    - Parallel processing where possible
+    - Minimal transformation overhead
+  </Tab>
+</Tabs>
+
+## Debugging
+
+### Enable Verbose Logging
+
+Check your build tool's output for transformation information:
+
+```bash
+# Vite
+vite build --debug
+
+# webpack
+webpack --mode development
+
+# esbuild
+# Check console output during build
+```
+
+### Verify Plugin Loading
+
+Ensure the plugin is loaded by checking your build configuration:
+
+```ts
+import saykit from 'unplugin-saykit/vite';
+
+console.log('Saykit plugin:', saykit);
+```
+
+### Check Transformations
+
+Inspect the build output to verify transformations were applied:
+
+```tsx
+// Original code
+<Say>Hello, world!</Say>
+
+// Should transform to something like:
+<Say id="a8f3c2d1" />
+```
+
+## Comparison: Babel Plugin vs Unplugin
+
+<Tabs>
+  <Tab title="Babel Plugin">
+    **Pros:**
+    - Deep Babel integration
+    - Works with all Babel-based tools
+    - Highly configurable
+    
+    **Cons:**
+    - Requires Babel in your build pipeline
+    - Slower than modern alternatives
+    - Not compatible with SWC or esbuild-only setups
+    
+    **Best for:**
+    - Projects already using Babel
+    - Next.js with Babel
+    - Create React App (ejected)
+  </Tab>
+  
+  <Tab title="Unplugin">
+    **Pros:**
+    - Works with any build tool
+    - No Babel dependency required
+    - Fast transformation
+    - Future-proof
+    
+    **Cons:**
+    - Less configuration options
+    - Newer tool (less battle-tested)
+    
+    **Best for:**
+    - Vite projects
+    - Modern build setups
+    - Next.js 13+ with SWC
+    - Any non-Babel build tool
+  </Tab>
+</Tabs>
+
+## Troubleshooting
+
+### Plugin not transforming files
+
+1. Verify the plugin is in your build configuration
+2. Check that you're importing from the correct path (e.g., `unplugin-saykit/vite`)
+3. Ensure files aren't in `node_modules`
+
+### TypeScript errors
+
+Make sure you have the necessary type definitions:
+
+```bash
+npm install --save-dev @types/node
+```
+
+### Build errors
+
+If you see transformation errors:
+
+1. Check that your syntax is valid JSX/TSX
+2. Ensure `Say` is imported from `@saykit/react`
+3. Verify file extensions are supported
+
+### Hot reload issues (Vite)
+
+If changes aren't reflected:
+
+1. Restart the dev server
+2. Clear Vite cache: `rm -rf node_modules/.vite`
+3. Check browser console for errors
+
+## Migration from Babel Plugin
+
+If you're migrating from `@saykit/babel-plugin`:
+
+<Steps>
+  <Step title="Install unplugin">
+    ```bash
+    npm install --save-dev unplugin-saykit
+    ```
+  </Step>
+  
+  <Step title="Remove Babel plugin">
+    Remove `@saykit/babel-plugin` from your Babel configuration:
+    
+    ```json .babelrc
+    {
+      "plugins": [
+        // Remove this:
+        // "@saykit/babel-plugin"
+      ]
+    }
+    ```
+  </Step>
+  
+  <Step title="Add unplugin to build config">
+    Add the appropriate unplugin import for your build tool:
+    
+    ```ts vite.config.ts
+    import saykit from 'unplugin-saykit/vite';
+    
+    export default defineConfig({
+      plugins: [saykit()],
+    });
+    ```
+  </Step>
+  
+  <Step title="Test your build">
+    Run your build and verify transformations still work:
+    
+    ```bash
+    npm run build
+    ```
+  </Step>
+</Steps>
+
+<Note>
+  Hash IDs are generated the same way in both plugins, so your message catalogs remain compatible.
+</Note>
+
+## See Also
+
+- [React Integration](/integrations/react) - Using the Say component
+- [Babel Plugin](/integrations/babel) - Alternative for Babel-based builds
+- [Message Extraction](/guides/message-extraction) - Understanding transformations
