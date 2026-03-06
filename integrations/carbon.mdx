@@ -1,0 +1,381 @@
+---
+title: Carbon Integration
+description: Use Saykit with Carbon framework for localized Discord bots
+---
+
+# Carbon Integration
+
+The `@saykit/carbon` package provides seamless integration between Saykit and [Carbon](https://github.com/buape/carbon), a framework for building Discord bots. It enables command localization, guild-level language preferences, and automated translation of Discord command metadata.
+
+## Installation
+
+Install both Saykit and the Carbon integration:
+
+<CodeGroup>
+
+```bash npm
+npm install saykit @saykit/carbon
+```
+
+```bash yarn
+yarn add saykit @saykit/carbon
+```
+
+```bash pnpm
+pnpm add saykit @saykit/carbon
+```
+
+</CodeGroup>
+
+## Setup
+
+### 1. Create Say Instance
+
+First, create a Say instance with your supported locales:
+
+```typescript
+import { Say } from 'saykit';
+
+const say = new Say({
+  locales: ['en', 'fr', 'es'],
+  messages: {
+    en: { /* English messages */ },
+    fr: { /* French messages */ },
+    es: { /* Spanish messages */ }
+  }
+});
+```
+
+### 2. Register the Plugin
+
+Add `SayPlugin` to your Carbon client:
+
+```typescript
+import { Client } from '@buape/carbon';
+import { SayPlugin } from '@saykit/carbon';
+
+const client = new Client(
+  {
+    clientId: process.env.CLIENT_ID!,
+    publicKey: process.env.PUBLIC_KEY!,
+    token: process.env.BOT_TOKEN!,
+  },
+  {
+    // Carbon options
+  },
+  [new SayPlugin(say)] // Register the plugin
+);
+```
+
+The `SayPlugin` registers the Say instance globally and applies extensions to interactions and guilds for easy access to localization utilities.
+
+## Localizing Commands
+
+Use the `withSay` higher-order function to create localized commands:
+
+```typescript
+import { BaseCommand, CommandInteraction } from '@buape/carbon';
+import { withSay } from '@saykit/carbon';
+
+class GreetCommand extends withSay(BaseCommand) {
+  constructor(say: Say) {
+    super(
+      say,
+      (say) => ({
+        name: say.call({ id: 'greet.name' }),
+        description: say.call({ id: 'greet.description' }),
+      }),
+    );
+  }
+
+  async run(interaction: CommandInteraction) {
+    const greeting = interaction.say.call({ id: 'greet.message' });
+    await interaction.reply({ content: greeting });
+  }
+}
+```
+
+### Command Properties
+
+The `withSay` wrapper automatically localizes command properties based on Discord's locale:
+
+- `name` - Command name (shown in slash command UI)
+- `description` - Command description
+- `options` - Command option names, descriptions, and choices
+- `subcommands` - Subcommand metadata
+- `subcommandGroups` - Subcommand group metadata
+
+All properties are generated for each supported locale and Discord will display the appropriate translation based on the user's language preference.
+
+## Localizing Components
+
+You can also localize Discord components like buttons, modals, and select menus:
+
+### Button Component
+
+```typescript
+import { Button } from '@buape/carbon';
+import { withSay } from '@saykit/carbon';
+
+class LocalizedButton extends withSay(Button) {
+  constructor(say: Say) {
+    super(
+      {
+        label: say.call({ id: 'button.label' }),
+      }
+    );
+  }
+}
+```
+
+### Modal
+
+```typescript
+import { Modal } from '@buape/carbon';
+import { withSay } from '@saykit/carbon';
+
+class FeedbackModal extends withSay(Modal) {
+  constructor(say: Say) {
+    super({
+      title: say.call({ id: 'modal.feedback.title' }),
+      components: [
+        {
+          type: 1,
+          components: [
+            {
+              type: 4,
+              customId: 'feedback',
+              label: say.call({ id: 'modal.feedback.label' }),
+              placeholder: say.call({ id: 'modal.feedback.placeholder' }),
+            }
+          ]
+        }
+      ]
+    });
+  }
+}
+```
+
+## Interaction Extensions
+
+The Carbon integration extends Carbon's interaction classes with a `say` property:
+
+```typescript
+class MyCommand extends BaseCommand {
+  async run(interaction: CommandInteraction) {
+    // Access Say instance directly from interaction
+    const message = interaction.say.call({ 
+      id: 'welcome', 
+      username: interaction.user.username 
+    });
+    
+    await interaction.reply({ content: message });
+  }
+}
+```
+
+Available on:
+- `CommandInteraction`
+- `AutocompleteInteraction`
+- `ComponentInteraction`
+- `ModalSubmitInteraction`
+
+## Guild-Level Localization
+
+Access guild-specific locale preferences:
+
+```typescript
+class ServerStatsCommand extends BaseCommand {
+  async run(interaction: CommandInteraction) {
+    // Get guild's preferred locale
+    const guildLocale = interaction.guild?.locale ?? 'en';
+    
+    // Activate the guild's locale
+    interaction.say.activate(guildLocale);
+    
+    const stats = interaction.say.call({ 
+      id: 'stats.members',
+      count: interaction.guild?.memberCount ?? 0
+    });
+    
+    await interaction.reply({ content: stats });
+  }
+}
+```
+
+## Message Formatting
+
+Use ICU MessageFormat features with Carbon interactions:
+
+### Pluralization
+
+```typescript
+const message = interaction.say.plural(messageCount, {
+  0: 'No new messages',
+  one: '# new message',
+  other: '# new messages'
+});
+```
+
+### Select
+
+```typescript
+const status = interaction.say.select(userStatus, {
+  online: 'User is online',
+  offline: 'User is offline',
+  other: 'Unknown status'
+});
+```
+
+## Complete Example
+
+Here's a complete example of a localized Carbon bot:
+
+```typescript
+import { Client, BaseCommand, CommandInteraction } from '@buape/carbon';
+import { Say } from 'saykit';
+import { SayPlugin, withSay } from '@saykit/carbon';
+
+// Initialize Say instance
+const say = new Say({
+  locales: ['en', 'fr'],
+  messages: {
+    en: {
+      'ping.name': 'ping',
+      'ping.description': 'Check bot latency',
+      'ping.response': 'Pong! Latency is {ms}ms'
+    },
+    fr: {
+      'ping.name': 'ping',
+      'ping.description': 'Vérifier la latence du bot',
+      'ping.response': 'Pong! La latence est de {ms}ms'
+    }
+  }
+});
+
+// Create localized command
+class PingCommand extends withSay(BaseCommand) {
+  constructor() {
+    super(
+      say,
+      (s) => ({
+        name: s.call({ id: 'ping.name' }),
+        description: s.call({ id: 'ping.description' }),
+      })
+    );
+  }
+
+  async run(interaction: CommandInteraction) {
+    const latency = Date.now() - interaction.createdTimestamp;
+    const response = interaction.say.call({ 
+      id: 'ping.response',
+      ms: latency
+    });
+    
+    await interaction.reply({ content: response });
+  }
+}
+
+// Initialize client with plugin
+const client = new Client(
+  {
+    clientId: process.env.CLIENT_ID!,
+    publicKey: process.env.PUBLIC_KEY!,
+    token: process.env.BOT_TOKEN!,
+  },
+  {
+    commands: [new PingCommand()]
+  },
+  [new SayPlugin(say)]
+);
+```
+
+## Type Safety
+
+The Carbon integration maintains full TypeScript type safety:
+
+```typescript
+import type { Say } from 'saykit';
+import type { BaseCommand } from '@buape/carbon';
+
+// Typed properties function
+type CommandProps = {
+  name: string;
+  description: string;
+};
+
+class TypedCommand extends withSay(BaseCommand) {
+  constructor(say: Say) {
+    super(
+      say,
+      (s): CommandProps => ({
+        name: s.call({ id: 'cmd.name' }),
+        description: s.call({ id: 'cmd.description' }),
+      })
+    );
+  }
+}
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Pre-load All Locales">
+    Load all locale messages at startup to avoid async issues during command registration:
+    
+    ```typescript
+    await say.load(...say.locales);
+    ```
+  </Accordion>
+  
+  <Accordion title="Use Consistent Message IDs">
+    Follow a naming convention for message IDs:
+    - `command.name.property` for command metadata
+    - `command.name.message.type` for response messages
+    
+    Example: `greet.name`, `greet.description`, `greet.message.success`
+  </Accordion>
+  
+  <Accordion title="Handle Missing Translations">
+    Always provide fallback text in your source locale to avoid runtime errors.
+  </Accordion>
+  
+  <Accordion title="Test with Multiple Locales">
+    Use Discord's language settings to test your bot in different locales during development.
+  </Accordion>
+</AccordionGroup>
+
+## API Reference
+
+### SayPlugin
+
+```typescript
+class SayPlugin extends Plugin {
+  constructor(say: Say)
+}
+```
+
+Registers a Say instance globally and applies interaction and guild extensions.
+
+### withSay
+
+```typescript
+function withSay<T extends BaseCommand>(Base: T): T
+function withSay<T extends BaseComponent | Modal>(Base: T): T
+```
+
+Higher-order function that enhances Carbon classes with localization support.
+
+**For Commands:**
+- Accepts a Say instance and properties mapping function
+- Automatically localizes command metadata for all supported locales
+
+**For Components:**
+- Accepts localized property values
+- Supports: `label`, `title`, `placeholder`, `content`
+
+## Related
+
+- [React Integration](/integrations/react) - Use Saykit with React
+- [Babel Plugin](/integrations/babel) - Configure the Babel transform
+- [Message Extraction](/guides/message-extraction) - Extract translatable messages
